@@ -1,0 +1,3 @@
+# Cloudflare Pages: always check for a newer version instead of using a cached copy.
+/*
+  Cache-Control: no-cache

@@ -11,6 +11,7 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
 const overlayHelp = document.getElementById('overlay-help');
 const playButton = document.getElementById('play');
+document.getElementById('build').textContent = `build ${C.BUILD}`;
 
 // Radius you respawn at for each checkpoint (index 0 = the start).
 const CHECKPOINT_R = [C.START_R, ...C.RINGS.map((r) => r + 90)];
@@ -113,7 +114,9 @@ function walk(v, dt) {
     const nx = p.x + d.x * s, ny = p.y + d.y * s;
     if (W.containsPoint(p.tile, nx, ny)) {
       moveTo(p.tile, nx, ny);
-      if (p.tile.dormant) W.startCrack(p.tile, p.lx, p.ly); // moving wakes it up
+      // Walking a little way across the piece you were left on wakes it up.
+      const rest = p.tile.dormant;
+      if (rest && Math.hypot(p.lx - rest.x, p.ly - rest.y) > C.WAKE_DISTANCE) W.startCrack(p.tile, p.lx, p.ly);
       return;
     }
     if (a === 0 && stepAcross(nx, ny, d)) return;
@@ -226,7 +229,7 @@ function updateTiles(dt) {
           p.lx -= home.srcCenter.x;
           p.ly -= home.srcCenter.y;
           // The piece you're left on has no timer until you move.
-          home.dormant = !home.solid;
+          if (!home.solid) home.dormant = { x: p.lx, y: p.ly };
         } else {
           fall();
         }

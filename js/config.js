@@ -1,5 +1,7 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
+  BUILD: 8,                         // shown on the title screen; bump on every deploy
+
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // reach this radius to win
   CORE_R: 70,                       // tiles closer than this are swallowed
@@ -31,6 +33,7 @@ export const CONFIG = {
   MIN_AREA: 900,                    // smaller scraps can't hold the player (they still drift on)
   SOLID_AREA: 2250,                 // tiles smaller than this never crack (too small to split)
   CRACK_TIME: 3.5,                  // seconds from a tile starting to crack to it breaking, any size
+  WAKE_DISTANCE: 8,                 // px you must walk on the piece you're left on before it starts cracking
   SHARD_SIZE: 20,                   // one piece per this many px of tile width (sqrt of area)
   SHARDS_MIN: 2,
   SHARDS_MAX: 14,
@@ -53,5 +56,5 @@ export const CONFIG = {
   PLAYER_SCREEN_Y: 0.55,            // player sits a bit below centre so you see outward
 
   // On-screen controls
-  JOY_DEADZONE: 0.15,               // fraction of the joystick radius that does nothing
+  JOY_DEADZONE: 0.25,               // fraction of the joystick radius that does nothing (a resting thumb)
 };
