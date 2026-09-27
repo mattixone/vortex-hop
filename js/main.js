@@ -3,7 +3,7 @@ import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import * as W from './world.js';
 import { render } from './render.js';
-import { input, initInput, moveVector, updateLayout } from './input.js';
+import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill } from './input.js';
 
 const canvas = document.getElementById('game');
 const overlay = document.getElementById('overlay');
@@ -29,8 +29,7 @@ const state = {
   trailTimer: 0,
   pulses: [],            // expanding rings when a checkpoint is reached
   message: null,         // { text, t }
-  charge: null,          // seconds the jump button has been held, or null
-  aim: null,             // where a jump released now would land (while charging)
+  aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
   view: { w: 0, h: 0, dpr: 1 },
 };
@@ -64,7 +63,7 @@ function newGame() {
   state.particles = [];
   state.trail = [];
   state.pulses = [];
-  state.charge = null;
+  input.slider = null;
   input.face = { x: 0, y: -1 };
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
@@ -133,29 +132,18 @@ function stepAcross(nx, ny, d) {
   return true;
 }
 
-function jumpDistance() {
-  return G.lerp(C.JUMP_MIN, C.JUMP_RANGE, G.clamp(state.charge / C.CHARGE_TIME, 0, 1));
+function jumpDistance(power) {
+  return G.lerp(C.JUMP_MIN, C.JUMP_RANGE, power);
 }
 
-// You can start charging mid-air; the jump only happens if you release on a tile.
-function startCharge() {
-  if (state.player.mode !== 'falling') state.charge = 0;
-}
-
-function releaseJump() {
+// You can set the slider mid-air; the jump only happens if you release on a tile.
+function jump(power) {
   const p = state.player;
-  if (state.charge === null) return;
-  const d = jumpDistance();
-  state.charge = null;
   if (p.mode !== 'tile') return;
-  const f = state.face;
+  const d = jumpDistance(power), f = state.face;
   p.mode = 'air';
   p.tile = null;
   p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0 };
-}
-
-function cancelCharge() {
-  state.charge = null;
 }
 
 function land() {
@@ -181,7 +169,6 @@ function fall() {
   p.mode = 'falling';
   p.tile = null;
   p.fallT = 0;
-  state.charge = null;
   state.falls++;
   say('Lost to the vortex');
 }
@@ -276,10 +263,14 @@ function updatePlayer(dt) {
   }
 
   state.face = worldDir(input.face);
-  if (state.charge !== null) state.charge += dt;
-  state.aim = state.charge !== null && p.mode === 'tile'
-    ? { x: p.x + state.face.x * jumpDistance(), y: p.y + state.face.y * jumpDistance() }
-    : null;
+  keyboardFill(dt);
+  const sl = input.slider;
+  if (sl && !sliderCancelled(sl) && p.mode === 'tile') {
+    const d = jumpDistance(G.clamp(sl.s, 0, 1));
+    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d };
+  } else {
+    state.aim = null;
+  }
 
   state.trailTimer -= dt;
   if (state.trailTimer <= 0 && p.mode !== 'falling') {
@@ -351,9 +342,7 @@ function resize() {
 
 initInput(canvas, {
   active: () => state.mode === 'play',
-  jumpStart: startCharge,
-  jumpRelease: releaseJump,
-  jumpCancel: cancelCharge,
+  jump,
   restart: newGame,
 });
 window.addEventListener('resize', resize);

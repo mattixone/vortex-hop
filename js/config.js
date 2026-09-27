@@ -40,9 +40,9 @@ export const CONFIG = {
   // Player
   WALK_SPEED: 110,                  // px/s across a tile at full joystick
   STEP_REACH: 14,                   // can step over gaps this wide onto a neighbouring tile
-  JUMP_MIN: 70,                     // a quick tap of the jump button
-  JUMP_RANGE: 260,                  // a fully charged jump
-  CHARGE_TIME: 0.8,                 // seconds of holding to reach JUMP_RANGE
+  JUMP_MIN: 70,                     // jump slider at rest (a quick tap)
+  JUMP_RANGE: 260,                  // jump slider pushed to the top
+  CHARGE_TIME: 0.8,                 // keyboard: seconds holding Space to fill the slider
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
   PLAYER_R: 10,
   FALL_TIME: 1.2,

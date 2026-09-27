@@ -2,7 +2,7 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import { speedFactor } from './world.js';
-import { input, getLayout } from './input.js';
+import { input, getLayout, sliderCancelled } from './input.js';
 
 // Colour scale: speed factor 0.8 (big, slow) is blue, SPEED_FACTOR_MAX (tiny, fast) is orange.
 const MIN_SF = Math.log(0.8), MAX_SF = Math.log(C.SPEED_FACTOR_MAX);
@@ -315,27 +315,77 @@ function drawControls(ctx, state) {
   ctx.arc(knob.x, knob.y, L.joyR * 0.42, 0, G.TAU);
   ctx.fill();
 
-  // Jump button with a charge ring.
-  const b = L.jump, held = state.charge !== null;
-  ctx.fillStyle = held ? 'rgba(90,255,170,0.35)' : 'rgba(90,255,170,0.15)';
-  ctx.strokeStyle = 'rgba(90,255,170,0.6)';
+  drawSlider(ctx, L.slider);
+}
+
+function roundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
-  ctx.arc(b.x, b.y, b.r, 0, G.TAU);
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Stubby vertical jump slider: up = further, the red bottom section cancels.
+function drawSlider(ctx, L) {
+  const sl = input.slider;
+  const x = sl ? sl.x : L.home.x;
+  const rest = sl ? sl.restY : L.home.restY;
+  const s = sl ? sl.s : 0;
+  const top = rest - L.upLen, bottom = rest + L.cancelLen;
+  const w = L.w, half = w / 2;
+  const cancelled = sl && sliderCancelled(sl);
+  const cancelY = rest + L.cancelS * L.upLen;
+
+  // Track
+  roundedRect(ctx, x - half, top - half, w, bottom - top + w, half);
+  ctx.fillStyle = sl ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)';
   ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
   ctx.stroke();
-  if (held) {
-    const k = G.clamp(state.charge / C.CHARGE_TIME, 0, 1);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = k >= 1 ? '#fff' : '#5affaa';
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r + 6, -Math.PI / 2, -Math.PI / 2 + k * G.TAU);
-    ctx.stroke();
+
+  // Cancel zone
+  ctx.save();
+  roundedRect(ctx, x - half, top - half, w, bottom - top + w, half);
+  ctx.clip();
+  ctx.fillStyle = cancelled ? 'rgba(255,90,90,0.55)' : 'rgba(255,90,90,0.18)';
+  ctx.fillRect(x - half, cancelY, w, bottom + half - cancelY);
+  // Distance fill from rest up to the thumb
+  if (s > 0) {
+    ctx.fillStyle = s >= 1 ? 'rgba(255,255,255,0.5)' : 'rgba(90,255,170,0.45)';
+    ctx.fillRect(x - half, rest - s * L.upLen, w, s * L.upLen);
   }
-  ctx.fillStyle = 'rgba(230,255,240,0.9)';
-  ctx.font = '700 14px system-ui, sans-serif';
+  ctx.restore();
+
+  const cx = (bottom + half + cancelY) / 2, k = half * 0.35;
+  ctx.strokeStyle = cancelled ? '#fff' : 'rgba(255,140,140,0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - k, cx - k); ctx.lineTo(x + k, cx + k);
+  ctx.moveTo(x + k, cx - k); ctx.lineTo(x - k, cx + k);
+  ctx.stroke();
+
+  // Rest mark
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.moveTo(x - half + 4, rest);
+  ctx.lineTo(x + half - 4, rest);
+  ctx.stroke();
+
+  // Thumb
+  const ty = rest - G.clamp(s, -L.cancelLen / L.upLen, 1) * L.upLen;
+  ctx.fillStyle = cancelled ? '#ff6b6b' : s >= 1 ? '#ffffff' : sl ? '#5affaa' : 'rgba(90,255,170,0.55)';
+  ctx.beginPath();
+  ctx.arc(x, ty, half * 1.25, 0, G.TAU);
+  ctx.fill();
+  ctx.fillStyle = '#05201a';
+  ctx.font = '700 11px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('JUMP', b.x, b.y);
+  ctx.fillText(cancelled ? '✕' : 'JUMP', x, ty);
 }
 
 export function render(canvas, state) {
