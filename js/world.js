@@ -16,7 +16,7 @@ function tileFromPoly(x, y, poly, angle) {
     crack: null,               // set when someone lands on the tile
     rubble: area < C.MIN_AREA, // too small to stand on; drifts until swallowed
     solid: area >= C.MIN_AREA && area < C.SOLID_AREA, // too small to split: never cracks
-    dormant: false,            // a piece you walked onto before its tile broke: waits for you to move
+    dormant: false,            // the piece you were on when its tile broke: waits for you to move
   };
 }
 
@@ -108,13 +108,7 @@ function shatterSeeds(t, n, lx, ly) {
   return seeds;
 }
 
-// Small tiles hold longer than big ones.
-export function crackDuration(t) {
-  return C.CRACK_BASE + C.CRACK_SMALL / Math.sqrt(t.area);
-}
-
-// `slow` stretches the timer (used for the piece left under the player).
-export function startCrack(t, lx, ly, slow = 1) {
+export function startCrack(t, lx, ly) {
   if (t.crack || t.rubble || t.solid) return;
   t.dormant = false;
   const n = pieceCount(t);
@@ -125,14 +119,9 @@ export function startCrack(t, lx, ly, slow = 1) {
     ix: lx, iy: ly,
     cells: G.voronoiCells(t.poly, seeds),
     t: 0,
-    duration: crackDuration(t) * slow,
+    duration: C.CRACK_TIME,
     reach,
   };
-}
-
-// The piece left under the player keeps breaking, a bit slower than a fresh tile.
-export function startAftershock(t, lx, ly) {
-  startCrack(t, lx, ly, C.AFTERSHOCK);
 }
 
 // Breaks a cracked tile into fragment tiles. Each fragment keeps `srcCell`

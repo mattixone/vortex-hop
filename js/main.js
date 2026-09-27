@@ -113,7 +113,7 @@ function walk(v, dt) {
     const nx = p.x + d.x * s, ny = p.y + d.y * s;
     if (W.containsPoint(p.tile, nx, ny)) {
       moveTo(p.tile, nx, ny);
-      if (p.tile.dormant) W.startAftershock(p.tile, p.lx, p.ly); // moving wakes it up
+      if (p.tile.dormant) W.startCrack(p.tile, p.lx, p.ly); // moving wakes it up
       return;
     }
     if (a === 0 && stepAcross(nx, ny, d)) return;
@@ -225,13 +225,8 @@ function updateTiles(dt) {
           p.tile = home;
           p.lx -= home.srcCenter.x;
           p.ly -= home.srcCenter.y;
-          if (G.pointInPolygon(t.crack.ix, t.crack.iy, home.srcCell)) {
-            // Still on the piece you landed on: it keeps breaking, from your feet.
-            W.startAftershock(home, p.lx, p.ly);
-          } else {
-            // You walked onto another piece before the break: it waits until you move.
-            home.dormant = true;
-          }
+          // The piece you're left on has no timer until you move.
+          home.dormant = !home.solid;
         } else {
           fall();
         }
