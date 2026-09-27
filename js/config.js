@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 8,                         // shown on the title screen; bump on every deploy
+  BUILD: 9,                         // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // reach this radius to win
@@ -53,7 +53,14 @@ export const CONFIG = {
 
   // Camera
   VIEW_SIZE: 1000,                  // world pixels across the shorter screen side
-  PLAYER_SCREEN_Y: 0.55,            // player sits a bit below centre so you see outward
+  PLAYER_SCREEN_Y: 0.55,            // player sits a bit below centre so you see ahead
+  CAMERA_TURN: 3,                   // how quickly the view swings round behind you once you stop walking
+  // Zoom follows the tile you're standing on: ZOOM_NEAR on tiles ZOOM_SMALL_W wide or less,
+  // 1 (normal) on tiles ZOOM_LARGE_W wide or more, in between on medium tiles.
+  ZOOM_NEAR: 1.5,
+  ZOOM_SMALL_W: 60,
+  ZOOM_LARGE_W: 200,
+  ZOOM_SPEED: 2,
 
   // On-screen controls
   JOY_DEADZONE: 0.25,               // fraction of the joystick radius that does nothing (a resting thumb)

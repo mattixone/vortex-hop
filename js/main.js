@@ -20,7 +20,7 @@ const state = {
   mode: 'title',         // 'title' | 'play' | 'won'
   tiles: [],
   player: null,
-  cam: { x: 0, y: 0, angle: 0, shake: 0 },
+  cam: { x: 0, y: 0, angle: 0, shake: 0, zoom: 1 },
   checkpoint: 0,
   best: 0,
   falls: 0,
@@ -32,6 +32,7 @@ const state = {
   message: null,         // { text, t }
   aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
+  walking: false,        // joystick/keys held this frame (the camera waits until you stop)
   view: { w: 0, h: 0, dpr: 1 },
 };
 window.game = state; // handy for poking at from the dev console
@@ -51,6 +52,9 @@ function spawnSafeTile(r) {
 
 function putPlayerOn(tile) {
   state.player = { mode: 'tile', tile, lx: 0, ly: 0, x: tile.x, y: tile.y, jump: null, fallT: 0 };
+  // Start facing outward, towards the rim.
+  const r = Math.hypot(tile.x, tile.y) || 1;
+  state.face = { x: tile.x / r, y: tile.y / r };
 }
 
 function newGame() {
@@ -65,10 +69,10 @@ function newGame() {
   state.trail = [];
   state.pulses = [];
   input.slider = null;
-  input.face = { x: 0, y: -1 };
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
-  state.cam.angle = -Math.PI / 2 - Math.atan2(state.player.y, state.player.x);
+  state.cam.angle = -Math.PI / 2 - Math.atan2(state.face.y, state.face.x);
+  state.cam.zoom = zoomFor(state.player.tile);
   state.mode = 'play';
   overlay.hidden = true;
   say('Reach the rim');
@@ -252,7 +256,9 @@ function updateTiles(dt) {
 
 function updatePlayer(dt) {
   const p = state.player;
-  const move = state.mode === 'play' ? moveVector() : null; // also updates facing
+  const move = state.mode === 'play' ? moveVector() : null;
+  state.walking = !!move;
+  if (move) state.face = worldDir(move); // facing is kept in world space
   if (p.mode === 'tile') {
     const w = W.toWorld(p.tile, p.lx, p.ly);
     p.x = w.x;
@@ -271,7 +277,6 @@ function updatePlayer(dt) {
     if (p.fallT >= C.FALL_TIME) respawn();
   }
 
-  state.face = worldDir(input.face);
   keyboardFill(dt);
   const sl = input.slider;
   if (sl && !sliderCancelled(sl) && p.mode === 'tile') {
@@ -289,14 +294,25 @@ function updatePlayer(dt) {
   }
 }
 
+function zoomFor(tile) {
+  const w = Math.sqrt(tile.area);
+  const k = G.clamp(Math.log(w / C.ZOOM_SMALL_W) / Math.log(C.ZOOM_LARGE_W / C.ZOOM_SMALL_W), 0, 1);
+  return G.lerp(C.ZOOM_NEAR, 1, k);
+}
+
 function updateCamera(dt) {
   const p = state.player, cam = state.cam;
   const follow = 1 - Math.exp(-8 * dt);
   cam.x += (p.x - cam.x) * follow;
   cam.y += (p.y - cam.y) * follow;
-  // Rotate the view so "outward" always points up the screen.
-  const target = -Math.PI / 2 - Math.atan2(cam.y, cam.x);
-  cam.angle += G.wrapAngle(target - cam.angle) * (1 - Math.exp(-4 * dt));
+  // Once you stop walking, swing the view round so you're facing up the screen.
+  // (Turning while you walk would make screen-relative controls walk in circles.)
+  if (!state.walking) {
+    const target = -Math.PI / 2 - Math.atan2(state.face.y, state.face.x);
+    cam.angle += G.wrapAngle(target - cam.angle) * (1 - Math.exp(-C.CAMERA_TURN * dt));
+  }
+  // Zoom in on smaller tiles; hold the zoom while airborne or falling.
+  if (p.mode === 'tile') cam.zoom += (zoomFor(p.tile) - cam.zoom) * (1 - Math.exp(-C.ZOOM_SPEED * dt));
   cam.shake *= Math.exp(-10 * dt);
 }
 
@@ -364,4 +380,5 @@ W.populate(state.tiles);
 putPlayerOn(spawnSafeTile(C.START_R));
 state.cam.x = state.player.x;
 state.cam.y = state.player.y;
+state.cam.angle = -Math.PI / 2 - Math.atan2(state.face.y, state.face.x);
 requestAnimationFrame(frame);

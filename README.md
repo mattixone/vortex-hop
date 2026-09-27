@@ -12,7 +12,7 @@ No build step and no dependencies: just `index.html` and the files in `js/`.
 | Jump | Slider appears under your right thumb. Slide up = further, down into the red = cancel, let go = jump. | Hold Space (fills the slider), Esc cancels |
 | Restart | | R |
 
-Directions are relative to the screen: up always points outward, towards the rim. Walking off your tile's edge steps you onto any tile that overlaps it (or nearly touches it); otherwise you slide along the edge.
+Directions are relative to the screen. When you stop walking, the view swings round so you're facing up the screen, and a small gold arrow next to you always points to the rim. The camera zooms in when you're on smaller tiles. Walking off your tile's edge steps you onto any tile that overlaps it (or nearly touches it); otherwise you slide along the edge.
 
 ## Run it locally
 
@@ -42,8 +42,9 @@ npx serve .        # or: python3 -m http.server
 ## Roadmap
 
 - [x] Spiral motion, size-based speed, jumping, Voronoi cracking and shattering
-- [x] Checkpoint rings, follow camera (outward is up), minimap
+- [x] Checkpoint rings, follow camera, minimap
 - [x] Joystick + jump slider, walking between overlapping tiles
+- [x] Camera turns to your facing direction when you stop; zoom follows tile size
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones

@@ -8,7 +8,7 @@ import { input, getLayout, sliderCancelled } from './input.js';
 const MIN_SF = Math.log(0.8), MAX_SF = Math.log(C.SPEED_FACTOR_MAX);
 
 function viewScale(state) {
-  return Math.min(state.view.w, state.view.h) / C.VIEW_SIZE;
+  return (Math.min(state.view.w, state.view.h) / C.VIEW_SIZE) * state.cam.zoom;
 }
 
 function viewOrigin(state) {
@@ -198,6 +198,21 @@ function drawPlayer(ctx, state, px) {
   ctx.beginPath();
   ctx.arc(p.x, p.y, r * s, 0, G.TAU);
   ctx.fill();
+
+  // Small gold chevron pointing outward, towards the rim (the view no longer keeps outward up).
+  if (p.mode !== 'falling') {
+    const rr = Math.hypot(p.x, p.y) || 1, ox = p.x / rr, oy = p.y / rr;
+    const d = r * s + 26 * px, g = 5 * px;
+    const cx = p.x + ox * d, cy = p.y + oy * d;
+    ctx.fillStyle = 'rgba(255,215,100,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(cx + ox * g * 1.4, cy + oy * g * 1.4);
+    ctx.lineTo(cx - ox * g - oy * g, cy - oy * g + ox * g);
+    ctx.lineTo(cx - ox * g * 0.3, cy - oy * g * 0.3);
+    ctx.lineTo(cx - ox * g + oy * g, cy - oy * g - ox * g);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Facing arrow
   const f = state.face, tip = r * s + 9 * px, base = r * s + 3 * px, wing = 5 * px;

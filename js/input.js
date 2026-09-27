@@ -8,7 +8,6 @@ export const input = {
   // 1 at the top (longest jump) and negative when pulled down towards cancel.
   slider: null,
   keys: new Set(),
-  face: { x: 0, y: -1 },   // last direction moved, in screen space (up = outward)
 };
 
 let layout = null;
@@ -58,7 +57,6 @@ export function moveVector() {
   const mag = Math.hypot(x, y);
   if (mag < C.JOY_DEADZONE) return null;
   const m = Math.min(1, mag);
-  input.face = { x: x / mag, y: y / mag };
   return { x: x / mag, y: y / mag, mag: input.joy ? m : 1 };
 }
 
