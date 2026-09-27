@@ -35,7 +35,7 @@ function drawSpiralArms(ctx, state, px) {
   for (let k = 0; k < arms; k++) {
     const off = (k / arms) * G.TAU + state.time * 0.03;
     ctx.beginPath();
-    for (let th = 0; th < 16; th += 0.08) {
+    for (let th = 0; th < 22; th += 0.08) {
       const r = 60 * Math.exp(b * th);
       if (r > C.RIM + 400) break;
       const a = off - th; // arms trail behind the counter-clockwise flow

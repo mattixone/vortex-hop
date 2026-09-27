@@ -138,8 +138,8 @@ export function expectedCount(r0, r1) {
 
 function randomSize(r) {
   const outward = G.clamp(r / C.RIM, 0, 1);
-  const max = G.lerp(110, C.TILE_MAX_SIZE, outward);
-  return G.lerp(C.TILE_MIN_SIZE, max, Math.random());
+  const max = G.lerp(C.TILE_MAX_SIZE_CORE, C.TILE_MAX_SIZE, outward);
+  return C.TILE_MIN_SIZE * Math.pow(max / C.TILE_MIN_SIZE, Math.random());
 }
 
 // Tries a few random angles at radius r; places a tile where it doesn't overlap.
