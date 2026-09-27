@@ -211,6 +211,19 @@ function updateTiles(dt) {
   for (const t of state.tiles) {
     W.updateTile(t, dt);
 
+    if (t.crack && t.crack.t >= t.crack.duration && t.crack.crumble) {
+      const w = W.toWorld(t, t.crack.ix, t.crack.iy);
+      burst(w.x, w.y, 10, 'rgba(255,200,140,', 70);
+      t.crack = null;
+      t.rubble = true;
+      if (p.tile === t) {
+        fall();
+        state.cam.shake = 8;
+      }
+      next.push(t);
+      continue;
+    }
+
     if (t.crack && t.crack.t >= t.crack.duration) {
       const frags = W.shatter(t);
       const w = W.toWorld(t, t.crack.ix, t.crack.iy);
@@ -221,6 +234,8 @@ function updateTiles(dt) {
           p.tile = home;
           p.lx -= home.srcCenter.x;
           p.ly -= home.srcCenter.y;
+          // The piece you're left on keeps breaking, starting under your feet.
+          W.startAftershock(home, p.lx, p.ly);
         } else {
           fall();
         }

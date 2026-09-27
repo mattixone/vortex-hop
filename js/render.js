@@ -99,6 +99,21 @@ function drawTile(ctx, t, px) {
   ctx.strokeStyle = `hsl(${hue},80%,${60 + k * 20}%)`;
   ctx.stroke();
 
+  if (t.solid) {
+    // Too small to break: a gem-like inner facet marks it as safe to stand on.
+    ctx.beginPath();
+    t.poly.forEach((p, i) => {
+      const x = p.x * 0.5, y = p.y * 0.5;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fill();
+    ctx.lineWidth = 1.5 * px;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.stroke();
+  }
+
   if (crack) {
     // The drawn cracks are the real Voronoi cell edges, growing from the impact.
     ctx.save();

@@ -44,6 +44,7 @@ npx serve .        # or: python3 -m http.server
 - [x] Spiral motion, size-based speed, jumping, Voronoi cracking and shattering
 - [x] Checkpoint rings, follow camera (outward is up), minimap
 - [x] Joystick + jump slider, walking between overlapping tiles
+- [x] Size-based fracturing: small tiles split in 2–3, the piece you're on keeps breaking, tiny gem tiles are safe if you hop onto them
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones
 - [ ] Slingshot: shatter a far tile so its fragments come to you

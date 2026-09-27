@@ -29,11 +29,14 @@ export const CONFIG = {
 
   // Cracking and shattering
   MIN_AREA: 900,                    // smaller fragments crumble to rubble
+  SOLID_AREA: 2250,                 // tiles smaller than this never crack (too small to split)
   CRACK_BASE: 0.4,                  // crack time = CRACK_BASE + sqrt(area) * CRACK_PER_SIZE
   CRACK_PER_SIZE: 1 / 120,
-  SHARDS_MIN: 5,
+  AFTERSHOCK: 1.4,                  // the piece you're left on cracks this much slower than a fresh tile
+  SHARD_SIZE: 20,                   // one piece per this many px of tile width (sqrt of area)
+  SHARDS_MIN: 2,
   SHARDS_MAX: 14,
-  SHARD_AREA: 3000,                 // one extra shard per this much tile area
+  CLEAN_SPLIT_MAX: 3,               // tiles breaking into this few pieces split evenly instead of shattering
   SHATTER_KICK: 45,                 // px/s push away from the impact point
   KICK_DAMPING: 1.5,
 

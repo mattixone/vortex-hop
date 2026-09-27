@@ -15,6 +15,7 @@ function tileFromPoly(x, y, poly, angle) {
     kx: 0, ky: 0,              // shatter kick velocity, decays over time
     crack: null,               // set when someone lands on the tile
     rubble: area < C.MIN_AREA, // too small to stand on; fades away
+    solid: area >= C.MIN_AREA && area < C.SOLID_AREA, // too small to split: never cracks
     fade: 1,
   };
 }
@@ -75,25 +76,62 @@ export function containsPoint(t, x, y) {
 
 // Landing starts the crack. The fracture pattern is decided right now, so the
 // cracks drawn while the timer runs are exactly where the tile will break.
-export function startCrack(t, lx, ly) {
-  if (t.crack) return;
-  const n = Math.round(G.clamp(C.SHARDS_MIN + t.area / C.SHARD_AREA, C.SHARDS_MIN, C.SHARDS_MAX));
-  const seeds = [{ x: lx, y: ly }];
+// How many pieces a tile breaks into: more for bigger tiles, and never so many
+// that every piece would be rubble.
+function pieceCount(t) {
+  const n = Math.round(Math.sqrt(t.area) / C.SHARD_SIZE + (Math.random() - 0.5));
+  return Math.max(C.SHARDS_MIN, Math.min(n, C.SHARDS_MAX, Math.floor(t.area / (C.MIN_AREA * 1.2))));
+}
+
+// Small tiles split evenly: seeds sit around the tile's centre, rotated so a
+// break line runs from the centre out past the impact point.
+function cleanSplitSeeds(t, n, lx, ly) {
+  const offset = Math.atan2(ly, lx) - Math.PI / n + (Math.random() - 0.5) * 0.5;
+  const d = t.radius * 0.5;
+  const seeds = [];
   for (let i = 0; i < n; i++) {
-    // Seeds cluster around the impact: small shards there, big chunks far away.
+    const a = offset + (i / n) * G.TAU;
+    seeds.push({ x: Math.cos(a) * d, y: Math.sin(a) * d });
+  }
+  return seeds;
+}
+
+// Bigger tiles shatter: seeds cluster around the impact, so small shards
+// there and big chunks far away.
+function shatterSeeds(t, n, lx, ly) {
+  const seeds = [{ x: lx, y: ly }];
+  for (let i = 1; i < n; i++) {
     const a = Math.random() * G.TAU;
-    const d = 8 + t.radius * 1.1 * Math.pow(Math.random(), 1.5);
+    // Keep the nearest seeds a little away so the piece under your feet isn't a crumb.
+    const d = 30 + t.radius * 1.1 * Math.pow(Math.random(), 1.5);
     seeds.push({ x: lx + Math.cos(a) * d, y: ly + Math.sin(a) * d });
   }
+  return seeds;
+}
+
+// `slow` stretches the timer. `crumble` makes the tile turn to rubble instead of
+// splitting (the cracks are just for show) and works even on solid tiles.
+export function startCrack(t, lx, ly, slow = 1, crumble = false) {
+  if (t.crack || t.rubble || (t.solid && !crumble)) return;
+  const n = crumble ? 3 : pieceCount(t);
+  const seeds = n <= C.CLEAN_SPLIT_MAX ? cleanSplitSeeds(t, n, lx, ly) : shatterSeeds(t, n, lx, ly);
   let reach = 0;
   for (const p of t.poly) reach = Math.max(reach, Math.hypot(p.x - lx, p.y - ly));
   t.crack = {
     ix: lx, iy: ly,
     cells: G.voronoiCells(t.poly, seeds),
     t: 0,
-    duration: C.CRACK_BASE + Math.sqrt(t.area) * C.CRACK_PER_SIZE,
+    duration: (C.CRACK_BASE + Math.sqrt(t.area) * C.CRACK_PER_SIZE) * slow,
     reach,
+    crumble,
   };
+}
+
+// After a break, the piece left under the player keeps breaking, a bit slower
+// than a fresh tile. Gems are only safe if you hop onto them, so a gem-sized
+// piece you were left on crumbles instead.
+export function startAftershock(t, lx, ly) {
+  startCrack(t, lx, ly, C.AFTERSHOCK, t.solid);
 }
 
 // Breaks a cracked tile into fragment tiles. Each fragment keeps `srcCell`
