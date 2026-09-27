@@ -2,7 +2,8 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import * as W from './world.js';
-import { render, screenToWorld } from './render.js';
+import { render } from './render.js';
+import { input, initInput, moveVector, updateLayout } from './input.js';
 
 const canvas = document.getElementById('game');
 const overlay = document.getElementById('overlay');
@@ -28,7 +29,9 @@ const state = {
   trailTimer: 0,
   pulses: [],            // expanding rings when a checkpoint is reached
   message: null,         // { text, t }
-  pointer: null,         // last mouse position in screen space (for the aim reticle)
+  charge: null,          // seconds the jump button has been held, or null
+  aim: null,             // where a jump released now would land (while charging)
+  face: { x: 0, y: -1 }, // facing direction in world space
   view: { w: 0, h: 0, dpr: 1 },
 };
 window.game = state; // handy for poking at from the dev console
@@ -61,6 +64,8 @@ function newGame() {
   state.particles = [];
   state.trail = [];
   state.pulses = [];
+  state.charge = null;
+  input.face = { x: 0, y: -1 };
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
   state.cam.angle = -Math.PI / 2 - Math.atan2(state.player.y, state.player.x);
@@ -83,19 +88,74 @@ function burst(x, y, n, color, speed) {
 
 // ---- Player actions ----
 
-function jumpTo(tx, ty) {
+// Controls are screen-relative (up = outward), so rotate them into the world.
+function worldDir(v) {
+  return G.rotate(v.x, v.y, -state.cam.angle);
+}
+
+function moveTo(tile, x, y) {
+  const p = state.player, l = W.toLocal(tile, x, y);
+  p.tile = tile;
+  p.lx = l.x;
+  p.ly = l.y;
+  p.x = x;
+  p.y = y;
+}
+
+// Walking keeps you on your tile. At its edge you step onto any tile that
+// overlaps it (or is within STEP_REACH); otherwise you slide along the edge.
+function walk(v, dt) {
   const p = state.player;
-  if (p.mode !== 'tile') return;
-  let dx = tx - p.x, dy = ty - p.y;
-  const d = Math.hypot(dx, dy);
-  if (d < 4) return;
-  if (d > C.JUMP_RANGE) {
-    dx *= C.JUMP_RANGE / d;
-    dy *= C.JUMP_RANGE / d;
+  const dir = worldDir(v);
+  const step = C.WALK_SPEED * v.mag * dt;
+  for (const a of [0, 0.6, -0.6, 1.2, -1.2]) {
+    const d = G.rotate(dir.x, dir.y, a);
+    const s = step * Math.cos(a);
+    const nx = p.x + d.x * s, ny = p.y + d.y * s;
+    if (W.containsPoint(p.tile, nx, ny)) return moveTo(p.tile, nx, ny);
+    if (a === 0 && stepAcross(nx, ny, d)) return;
   }
+}
+
+function stepAcross(nx, ny, d) {
+  const p = state.player;
+  const rx = nx + d.x * C.STEP_REACH, ry = ny + d.y * C.STEP_REACH;
+  let next = null, x = 0, y = 0;
+  for (const t of state.tiles) {
+    if (t === p.tile || t.rubble) continue;
+    if (W.containsPoint(t, nx, ny)) { next = t; x = nx; y = ny; break; }
+    if (!next && W.containsPoint(t, rx, ry)) { next = t; x = rx; y = ry; }
+  }
+  if (!next) return false;
+  moveTo(next, x, y);
+  W.startCrack(next, p.lx, p.ly); // stepping on a tile cracks it, just like landing
+  checkProgress();
+  return true;
+}
+
+function jumpDistance() {
+  return G.lerp(C.JUMP_MIN, C.JUMP_RANGE, G.clamp(state.charge / C.CHARGE_TIME, 0, 1));
+}
+
+// You can start charging mid-air; the jump only happens if you release on a tile.
+function startCharge() {
+  if (state.player.mode !== 'falling') state.charge = 0;
+}
+
+function releaseJump() {
+  const p = state.player;
+  if (state.charge === null) return;
+  const d = jumpDistance();
+  state.charge = null;
+  if (p.mode !== 'tile') return;
+  const f = state.face;
   p.mode = 'air';
   p.tile = null;
-  p.jump = { sx: p.x, sy: p.y, tx: p.x + dx, ty: p.y + dy, t: 0 };
+  p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0 };
+}
+
+function cancelCharge() {
+  state.charge = null;
 }
 
 function land() {
@@ -121,6 +181,7 @@ function fall() {
   p.mode = 'falling';
   p.tile = null;
   p.fallT = 0;
+  state.charge = null;
   state.falls++;
   say('Lost to the vortex');
 }
@@ -195,10 +256,12 @@ function updateTiles(dt) {
 
 function updatePlayer(dt) {
   const p = state.player;
+  const move = state.mode === 'play' ? moveVector() : null; // also updates facing
   if (p.mode === 'tile') {
     const w = W.toWorld(p.tile, p.lx, p.ly);
     p.x = w.x;
     p.y = w.y;
+    if (move) walk(move, dt);
   } else if (p.mode === 'air') {
     const j = p.jump;
     j.t += dt;
@@ -211,6 +274,12 @@ function updatePlayer(dt) {
     W.driftPoint(p, C.MIN_AREA, dt * 3); // sucked in fast, like the tiniest shard
     if (p.fallT >= C.FALL_TIME) respawn();
   }
+
+  state.face = worldDir(input.face);
+  if (state.charge !== null) state.charge += dt;
+  state.aim = state.charge !== null && p.mode === 'tile'
+    ? { x: p.x + state.face.x * jumpDistance(), y: p.y + state.face.y * jumpDistance() }
+    : null;
 
   state.trailTimer -= dt;
   if (state.trailTimer <= 0 && p.mode !== 'falling') {
@@ -274,19 +343,18 @@ function resize() {
   state.view = { w: window.innerWidth, h: window.innerHeight, dpr };
   canvas.width = Math.round(state.view.w * dpr);
   canvas.height = Math.round(state.view.h * dpr);
+  // Size the canvas to the visible window: on iOS 100vh can include the hidden toolbar area.
+  canvas.style.width = `${state.view.w}px`;
+  canvas.style.height = `${state.view.h}px`;
+  updateLayout(state.view);
 }
 
-canvas.addEventListener('pointerdown', (e) => {
-  if (state.mode !== 'play') return;
-  const w = screenToWorld(state, e.clientX, e.clientY);
-  jumpTo(w.x, w.y);
-});
-canvas.addEventListener('pointermove', (e) => {
-  state.pointer = e.pointerType === 'mouse' ? { x: e.clientX, y: e.clientY } : null;
-});
-canvas.addEventListener('pointerleave', () => { state.pointer = null; });
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') newGame();
+initInput(canvas, {
+  active: () => state.mode === 'play',
+  jumpStart: startCharge,
+  jumpRelease: releaseJump,
+  jumpCancel: cancelCharge,
+  restart: newGame,
 });
 window.addEventListener('resize', resize);
 playButton.addEventListener('click', newGame);

@@ -35,12 +35,19 @@ export const CONFIG = {
   KICK_DAMPING: 1.5,
 
   // Player
-  JUMP_RANGE: 260,
+  WALK_SPEED: 110,                  // px/s across a tile at full joystick
+  STEP_REACH: 14,                   // can step over gaps this wide onto a neighbouring tile
+  JUMP_MIN: 70,                     // a quick tap of the jump button
+  JUMP_RANGE: 260,                  // a fully charged jump
+  CHARGE_TIME: 0.8,                 // seconds of holding to reach JUMP_RANGE
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
   PLAYER_R: 10,
   FALL_TIME: 1.2,
 
   // Camera
   VIEW_SIZE: 1000,                  // world pixels across the shorter screen side
-  PLAYER_SCREEN_Y: 0.6,             // player sits a bit below centre so you see outward
+  PLAYER_SCREEN_Y: 0.55,            // player sits a bit below centre so you see outward
+
+  // On-screen controls
+  JOY_DEADZONE: 0.15,               // fraction of the joystick radius that does nothing
 };

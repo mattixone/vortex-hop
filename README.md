@@ -4,6 +4,16 @@ A small browser game: hop between tiles drifting around a vortex and escape to t
 
 No build step and no dependencies: just `index.html` and the files in `js/`.
 
+## Controls
+
+| | Touch | Keyboard |
+|---|---|---|
+| Walk | Joystick: put your left thumb anywhere on the left half | Arrows or WASD |
+| Jump | Hold anywhere on the right half, release to jump. Longer hold = further. | Hold Space |
+| Restart | | R |
+
+Directions are relative to the screen: up always points outward, towards the rim. Walking off your tile's edge steps you onto any tile that overlaps it (or nearly touches it); otherwise you slide along the edge.
+
 ## Run it locally
 
 ES modules don't load from `file://`, so serve the folder:
@@ -19,8 +29,9 @@ npx serve .        # or: python3 -m http.server
 | `js/config.js` | Every tunable number (speeds, sizes, jump range, rings). Start here. |
 | `js/geometry.js` | Polygon helpers and the Voronoi clipping. |
 | `js/world.js` | Tile motion, cracking, shattering, keeping the vortex stocked. |
-| `js/main.js` | Game state, player, input, main loop. |
-| `js/render.js` | Drawing: vortex, tiles, player, minimap, HUD. |
+| `js/input.js` | On-screen joystick and jump button, keyboard. |
+| `js/main.js` | Game state, walking, jumping, main loop. |
+| `js/render.js` | Drawing: vortex, tiles, player, minimap, HUD, controls. |
 
 ## Deploy on Cloudflare Pages
 
@@ -32,6 +43,7 @@ npx serve .        # or: python3 -m http.server
 
 - [x] Spiral motion, size-based speed, jumping, Voronoi cracking and shattering
 - [x] Checkpoint rings, follow camera (outward is up), minimap
+- [x] Joystick + hold-to-charge jump button, walking between overlapping tiles
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones
 - [ ] Slingshot: shatter a far tile so its fragments come to you

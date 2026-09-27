@@ -2,6 +2,7 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import { speedFactor } from './world.js';
+import { input, getLayout } from './input.js';
 
 // Colour scale: speed factor 0.8 (big, slow) is blue, SPEED_FACTOR_MAX (tiny, fast) is orange.
 const MIN_SF = Math.log(0.8), MAX_SF = Math.log(C.SPEED_FACTOR_MAX);
@@ -12,12 +13,6 @@ function viewScale(state) {
 
 function viewOrigin(state) {
   return { x: state.view.w / 2, y: state.view.h * C.PLAYER_SCREEN_Y };
-}
-
-export function screenToWorld(state, sx, sy) {
-  const o = viewOrigin(state), s = viewScale(state);
-  const p = G.rotate((sx - o.x) / s, (sy - o.y) / s, -state.cam.angle);
-  return { x: p.x + state.cam.x, y: p.y + state.cam.y };
 }
 
 // Slow, big tiles are cool blue; fast, small ones glow orange.
@@ -146,14 +141,26 @@ function drawPlayer(ctx, state, px) {
   }
   if (r <= 0) return;
 
-  if (p.mode === 'tile') {
+  if (state.aim) {
+    // Charging: faint max-range ring, dashed line and a marker where you'll land.
+    const a = state.aim;
     ctx.lineWidth = 1.5 * px;
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.setLineDash([8 * px, 8 * px]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
     ctx.arc(p.x, p.y, C.JUMP_RANGE, 0, G.TAU);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.setLineDash([6 * px, 6 * px]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(a.x, a.y);
+    ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineWidth = 2 * px;
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, 9 * px, 0, G.TAU);
+    ctx.stroke();
   }
   if (p.mode === 'air') {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -176,23 +183,17 @@ function drawPlayer(ctx, state, px) {
   ctx.beginPath();
   ctx.arc(p.x, p.y, r * s, 0, G.TAU);
   ctx.fill();
-  ctx.globalAlpha = 1;
-}
 
-function drawReticle(ctx, state, px) {
-  const p = state.player;
-  if (!state.pointer || p.mode !== 'tile' || state.mode !== 'play') return;
-  const w = screenToWorld(state, state.pointer.x, state.pointer.y);
-  let dx = w.x - p.x, dy = w.y - p.y;
-  const d = Math.hypot(dx, dy);
-  if (d > C.JUMP_RANGE) { dx *= C.JUMP_RANGE / d; dy *= C.JUMP_RANGE / d; }
-  const x = p.x + dx, y = p.y + dy, s = 10 * px;
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.lineWidth = 1.5 * px;
+  // Facing arrow
+  const f = state.face, tip = r * s + 9 * px, base = r * s + 3 * px, wing = 5 * px;
+  ctx.fillStyle = '#5affaa';
   ctx.beginPath();
-  ctx.moveTo(x - s, y); ctx.lineTo(x + s, y);
-  ctx.moveTo(x, y - s); ctx.lineTo(x, y + s);
-  ctx.stroke();
+  ctx.moveTo(p.x + f.x * tip, p.y + f.y * tip);
+  ctx.lineTo(p.x + f.x * base - f.y * wing, p.y + f.y * base + f.x * wing);
+  ctx.lineTo(p.x + f.x * base + f.y * wing, p.y + f.y * base - f.x * wing);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
 }
 
 function drawMinimap(ctx, state) {
@@ -294,6 +295,49 @@ function drawHud(ctx, state) {
   }
 }
 
+function drawControls(ctx, state) {
+  const L = getLayout();
+  if (!L || state.mode !== 'play') return;
+
+  // Joystick: sits at its home spot until a thumb lands on the left half.
+  const j = input.joy;
+  const base = j ? { x: j.ox, y: j.oy } : L.joyHome;
+  const knob = j ? { x: j.x, y: j.y } : L.joyHome;
+  ctx.fillStyle = j ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(base.x, base.y, L.joyR, 0, G.TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = j ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.arc(knob.x, knob.y, L.joyR * 0.42, 0, G.TAU);
+  ctx.fill();
+
+  // Jump button with a charge ring.
+  const b = L.jump, held = state.charge !== null;
+  ctx.fillStyle = held ? 'rgba(90,255,170,0.35)' : 'rgba(90,255,170,0.15)';
+  ctx.strokeStyle = 'rgba(90,255,170,0.6)';
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, G.TAU);
+  ctx.fill();
+  ctx.stroke();
+  if (held) {
+    const k = G.clamp(state.charge / C.CHARGE_TIME, 0, 1);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = k >= 1 ? '#fff' : '#5affaa';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r + 6, -Math.PI / 2, -Math.PI / 2 + k * G.TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(230,255,240,0.9)';
+  ctx.font = '700 14px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('JUMP', b.x, b.y);
+}
+
 export function render(canvas, state) {
   const ctx = canvas.getContext('2d');
   const { w, h, dpr } = state.view;
@@ -327,9 +371,9 @@ export function render(canvas, state) {
   }
   drawCore(ctx);
   drawPlayer(ctx, state, px);
-  drawReticle(ctx, state, px);
   ctx.restore();
 
   drawMinimap(ctx, state);
   drawHud(ctx, state);
+  drawControls(ctx, state);
 }

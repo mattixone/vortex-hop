@@ -2,13 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#05060d">
   <title>Vortex Hop</title>
   <style>
+    :root { --sab: env(safe-area-inset-bottom, 0px); }
+    html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05060d; color: #dfe7ff;
       font-family: system-ui, -apple-system, sans-serif; }
-    canvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
+    canvas { display: block; position: fixed; top: 0; left: 0; touch-action: none; }
     #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: rgba(5, 6, 13, 0.7); padding: 16px; }
     #overlay[hidden] { display: none; }
@@ -28,10 +33,11 @@
       <h1 id="overlay-title">Vortex Hop</h1>
       <p id="overlay-text">Hop from tile to tile out of the whirlpool and reach the golden rim.</p>
       <ul id="overlay-help">
-        <li><b>Tap or click</b> to jump. Tiles keep moving while you're in the air, so aim where they'll be.</li>
+        <li><b>Joystick</b> (left thumb) walks. Up is always outward. Walk off an edge onto any tile that overlaps yours.</li>
+        <li><b>Jump</b> (right thumb): hold to jump further, release to go. Tiles keep moving while you're in the air, so aim where they'll be.</li>
         <li>Tiles crack when you land. The cracks show exactly where they'll break.</li>
         <li>Small tiles are faster and sink sooner. Blue is slow, orange is fast.</li>
-        <li>Green rings are checkpoints. <b>R</b> restarts.</li>
+        <li>Green rings are checkpoints. Keyboard: arrows or WASD, Space to jump, R restarts.</li>
       </ul>
       <button id="play">Play</button>
     </div>
