@@ -87,7 +87,7 @@ function drawTile(ctx, t, px) {
   const hue = tileHue(t);
   tracePoly(ctx, t.poly);
   if (t.rubble) {
-    ctx.globalAlpha = Math.max(0, t.fade) * 0.6;
+    ctx.globalAlpha = 0.55;
     ctx.fillStyle = `hsl(${hue},25%,30%)`;
     ctx.fill();
     ctx.restore();

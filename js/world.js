@@ -14,9 +14,9 @@ function tileFromPoly(x, y, poly, angle) {
     spin: (Math.random() - 0.5) * 0.3,
     kx: 0, ky: 0,              // shatter kick velocity, decays over time
     crack: null,               // set when someone lands on the tile
-    rubble: area < C.MIN_AREA, // too small to stand on; fades away
+    rubble: area < C.MIN_AREA, // too small to stand on; drifts until swallowed
     solid: area >= C.MIN_AREA && area < C.SOLID_AREA, // too small to split: never cracks
-    fade: 1,
+    dormant: false,            // a piece you walked onto before its tile broke: waits for you to move
   };
 }
 
@@ -54,7 +54,6 @@ export function updateTile(t, dt) {
   t.ky *= damp;
   t.angle += t.spin * dt;
   if (t.crack) t.crack.t += dt;
-  if (t.rubble) t.fade -= dt;
 }
 
 // Converts a world point into the tile's local frame.
@@ -109,11 +108,16 @@ function shatterSeeds(t, n, lx, ly) {
   return seeds;
 }
 
-// `slow` stretches the timer. `crumble` makes the tile turn to rubble instead of
-// splitting (the cracks are just for show) and works even on solid tiles.
-export function startCrack(t, lx, ly, slow = 1, crumble = false) {
-  if (t.crack || t.rubble || (t.solid && !crumble)) return;
-  const n = crumble ? 3 : pieceCount(t);
+// Small tiles hold longer than big ones.
+export function crackDuration(t) {
+  return C.CRACK_BASE + C.CRACK_SMALL / Math.sqrt(t.area);
+}
+
+// `slow` stretches the timer (used for the piece left under the player).
+export function startCrack(t, lx, ly, slow = 1) {
+  if (t.crack || t.rubble || t.solid) return;
+  t.dormant = false;
+  const n = pieceCount(t);
   const seeds = n <= C.CLEAN_SPLIT_MAX ? cleanSplitSeeds(t, n, lx, ly) : shatterSeeds(t, n, lx, ly);
   let reach = 0;
   for (const p of t.poly) reach = Math.max(reach, Math.hypot(p.x - lx, p.y - ly));
@@ -121,17 +125,14 @@ export function startCrack(t, lx, ly, slow = 1, crumble = false) {
     ix: lx, iy: ly,
     cells: G.voronoiCells(t.poly, seeds),
     t: 0,
-    duration: (C.CRACK_BASE + Math.sqrt(t.area) * C.CRACK_PER_SIZE) * slow,
+    duration: crackDuration(t) * slow,
     reach,
-    crumble,
   };
 }
 
-// After a break, the piece left under the player keeps breaking, a bit slower
-// than a fresh tile. Gems are only safe if you hop onto them, so a gem-sized
-// piece you were left on crumbles instead.
+// The piece left under the player keeps breaking, a bit slower than a fresh tile.
 export function startAftershock(t, lx, ly) {
-  startCrack(t, lx, ly, C.AFTERSHOCK, t.solid);
+  startCrack(t, lx, ly, C.AFTERSHOCK);
 }
 
 // Breaks a cracked tile into fragment tiles. Each fragment keeps `srcCell`

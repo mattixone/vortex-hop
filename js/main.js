@@ -111,7 +111,11 @@ function walk(v, dt) {
     const d = G.rotate(dir.x, dir.y, a);
     const s = step * Math.cos(a);
     const nx = p.x + d.x * s, ny = p.y + d.y * s;
-    if (W.containsPoint(p.tile, nx, ny)) return moveTo(p.tile, nx, ny);
+    if (W.containsPoint(p.tile, nx, ny)) {
+      moveTo(p.tile, nx, ny);
+      if (p.tile.dormant) W.startAftershock(p.tile, p.lx, p.ly); // moving wakes it up
+      return;
+    }
     if (a === 0 && stepAcross(nx, ny, d)) return;
   }
 }
@@ -211,19 +215,6 @@ function updateTiles(dt) {
   for (const t of state.tiles) {
     W.updateTile(t, dt);
 
-    if (t.crack && t.crack.t >= t.crack.duration && t.crack.crumble) {
-      const w = W.toWorld(t, t.crack.ix, t.crack.iy);
-      burst(w.x, w.y, 10, 'rgba(255,200,140,', 70);
-      t.crack = null;
-      t.rubble = true;
-      if (p.tile === t) {
-        fall();
-        state.cam.shake = 8;
-      }
-      next.push(t);
-      continue;
-    }
-
     if (t.crack && t.crack.t >= t.crack.duration) {
       const frags = W.shatter(t);
       const w = W.toWorld(t, t.crack.ix, t.crack.iy);
@@ -234,8 +225,13 @@ function updateTiles(dt) {
           p.tile = home;
           p.lx -= home.srcCenter.x;
           p.ly -= home.srcCenter.y;
-          // The piece you're left on keeps breaking, starting under your feet.
-          W.startAftershock(home, p.lx, p.ly);
+          if (G.pointInPolygon(t.crack.ix, t.crack.iy, home.srcCell)) {
+            // Still on the piece you landed on: it keeps breaking, from your feet.
+            W.startAftershock(home, p.lx, p.ly);
+          } else {
+            // You walked onto another piece before the break: it waits until you move.
+            home.dormant = true;
+          }
         } else {
           fall();
         }
@@ -246,7 +242,7 @@ function updateTiles(dt) {
     }
 
     const swallowed = Math.hypot(t.x, t.y) < C.CORE_R;
-    if (swallowed || (t.rubble && t.fade <= 0)) {
+    if (swallowed) {
       if (p.tile === t) fall();
       continue;
     }

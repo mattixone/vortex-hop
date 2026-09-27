@@ -28,10 +28,10 @@ export const CONFIG = {
   TILE_MAX_SIZE: 280,
 
   // Cracking and shattering
-  MIN_AREA: 900,                    // smaller fragments crumble to rubble
+  MIN_AREA: 900,                    // smaller scraps can't hold the player (they still drift on)
   SOLID_AREA: 2250,                 // tiles smaller than this never crack (too small to split)
-  CRACK_BASE: 0.4,                  // crack time = CRACK_BASE + sqrt(area) * CRACK_PER_SIZE
-  CRACK_PER_SIZE: 1 / 120,
+  CRACK_BASE: 0.6,                  // crack time = CRACK_BASE + CRACK_SMALL / width,
+  CRACK_SMALL: 120,                 // so small tiles hold longer (width = sqrt of area)
   AFTERSHOCK: 1.4,                  // the piece you're left on cracks this much slower than a fresh tile
   SHARD_SIZE: 20,                   // one piece per this many px of tile width (sqrt of area)
   SHARDS_MIN: 2,
