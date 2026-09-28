@@ -4,6 +4,7 @@ import * as G from './geometry.js';
 
 export const input = {
   sliderEnabled: false,    // optional two-handed jump slider (a setting)
+  rumbleEnabled: true,     // controller rumble and phone vibration (a setting)
   joy: null,               // { id, ox, oy, x, y, t0 } while a finger is on the joystick
   aim: null,               // double-tap-and-drag jump being aimed: { id, ox, oy, x, y }
   // Jump slider while held: { id, startY, x, restY, s }. s is 0 at rest (short hop),
@@ -109,7 +110,7 @@ export function aimVector() {
 function tickOnBandChange() {
   const v = aimVector();
   const level = v ? v.level : -1;
-  if (level !== lastLevel && level >= 0) {
+  if (level !== lastLevel && level >= 0 && input.rumbleEnabled) {
     try { navigator.vibrate?.(8); } catch { /* not supported */ }
   }
   lastLevel = level;

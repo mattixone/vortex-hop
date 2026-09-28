@@ -26,14 +26,20 @@
     button:hover { filter: brightness(1.1); }
     .build { font-size: 12px; opacity: 0.5; margin-top: 14px; }
     .pad-hint { font-size: 14px; color: #5affaa; margin-top: 12px; }
-    button.link { background: none; color: #5affaa; text-decoration: underline; padding: 0; margin: 0 0 0 6px;
-      font-size: 14px; font-weight: 600; border-radius: 0; }
+    .card-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    button.secondary { background: transparent; color: #5affaa; box-shadow: inset 0 0 0 2px #5affaa; }
+    .settings { text-align: left; width: 100%; }
+    .settings h2 { margin: 0 0 12px; font-size: 26px; text-align: center; }
+    .settings h3 { margin: 18px 0 4px; font-size: 16px; }
+    .settings .setting { justify-content: flex-start; align-items: flex-start; text-align: left; }
+    .settings .setting input { flex: none; margin-top: 2px; }
+    .settings #settings-close { display: block; margin: 18px auto 0; }
     .pad-panel { margin-top: 12px; padding: 12px; border: 1px solid rgba(90,255,170,0.35); border-radius: 12px; text-align: left; }
     .pad-step { color: #fff; font-weight: 600; margin: 0 0 8px; }
     .pad-readout { font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; color: #b8c2e6; margin: 0 0 8px; }
     .pad-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
     button.small { margin: 0; font-size: 13px; padding: 7px 14px; }
-    .setting { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 12px;
+    .setting { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 12px;
       font-size: 14px; color: #b8c2e6; }
     .setting input { width: 18px; height: 18px; accent-color: #5affaa; }
   </style>
@@ -41,7 +47,7 @@
 <body>
   <canvas id="game"></canvas>
   <div id="overlay">
-    <div class="card">
+    <div id="main-card" class="card">
       <h1 id="overlay-title">Vortex Hop</h1>
       <p id="overlay-text">Survive as long as you can. The vortex keeps getting stronger, and each fall adds 1×; at 5× the run ends. Grab glowing orbs to calm it: the deeper they are, the more they're worth.</p>
       <ul id="overlay-help">
@@ -50,19 +56,27 @@
         <li>Small tiles are faster (orange). Tiny <b>gem</b> tiles never break.</li>
         <li>Controller: left stick walks, right stick aims, A jumps.</li>
       </ul>
-      <label class="setting"><input type="checkbox" id="slider-toggle"> Jump slider (two-handed long jumps)</label>
-      <button id="play">Play</button>
-      <p id="pad-hint" class="pad-hint" hidden>Controller connected: press A to play <button id="pad-setup-open" class="link">Set up controller</button></p>
-      <div id="pad-panel" class="pad-panel" hidden>
+      <div class="card-buttons">
+        <button id="play">Play</button>
+        <button id="settings-open" class="secondary">Settings</button>
+      </div>
+      <p id="pad-hint" class="pad-hint" hidden>Controller connected: press A to play</p>
+      <p id="build" class="build"></p>
+    </div>
+    <div id="settings" class="card settings" hidden>
+      <h2>Settings</h2>
+      <label class="setting"><input type="checkbox" id="slider-toggle"> Two-handed mode: jump slider on the right half of the screen</label>
+      <label class="setting"><input type="checkbox" id="rumble-toggle"> Rumble and vibration</label>
+      <h3>Controller</h3>
+      <div class="pad-panel">
         <p id="pad-step" class="pad-step"></p>
         <pre id="pad-readout" class="pad-readout"></pre>
         <div class="pad-buttons">
           <button id="pad-setup-start" class="small">Start setup</button>
           <button id="pad-reset" class="small">Reset to default</button>
-          <button id="pad-close" class="small">Close</button>
         </div>
       </div>
-      <p id="build" class="build"></p>
+      <button id="settings-close">Done</button>
     </div>
   </div>
   <script type="module" src="js/main.js"></script>

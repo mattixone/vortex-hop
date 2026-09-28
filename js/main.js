@@ -18,7 +18,8 @@ document.getElementById('build').textContent = `build ${C.BUILD}`;
 
 
 const BEST_KEY = 'vortex-hop-best';
-const SLIDER_KEY = 'vortex-hop-slider';
+const SETTINGS_KEY = 'vortex-hop-settings';
+const OLD_SLIDER_KEY = 'vortex-hop-slider';
 
 function loadBest() {
   try { return parseFloat(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; }
@@ -28,13 +29,40 @@ function saveBest(t) {
   try { localStorage.setItem(BEST_KEY, String(t)); } catch { /* private mode etc. */ }
 }
 
-// Optional two-handed jump slider (off by default; double-tap-and-drag always works).
+// ---- Settings (saved on the device) ----
+// slider: optional two-handed jump slider (off by default; double-tap-and-drag always works)
+// rumble: controller rumble and phone vibration (on by default)
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    const oldSlider = localStorage.getItem(OLD_SLIDER_KEY) === '1'; // from before the settings screen
+    input.sliderEnabled = saved.slider ?? oldSlider;
+    input.rumbleEnabled = saved.rumble ?? true;
+  } catch { /* storage blocked: defaults */ }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ slider: input.sliderEnabled, rumble: input.rumbleEnabled }));
+  } catch { /* storage blocked */ }
+}
+
+loadSettings();
 const sliderToggle = document.getElementById('slider-toggle');
-try { input.sliderEnabled = localStorage.getItem(SLIDER_KEY) === '1'; } catch { /* storage blocked */ }
+const rumbleToggle = document.getElementById('rumble-toggle');
 sliderToggle.checked = input.sliderEnabled;
+rumbleToggle.checked = input.rumbleEnabled;
 sliderToggle.addEventListener('change', () => {
   input.sliderEnabled = sliderToggle.checked;
-  try { localStorage.setItem(SLIDER_KEY, input.sliderEnabled ? '1' : '0'); } catch { /* storage blocked */ }
+  saveSettings();
+});
+rumbleToggle.addEventListener('change', () => {
+  input.rumbleEnabled = rumbleToggle.checked;
+  saveSettings();
+  if (input.rumbleEnabled) {
+    rumble(0.5, 0.5, 150); // a quick test buzz if a controller is connected
+    try { navigator.vibrate?.(30); } catch { /* not supported */ }
+  }
 });
 
 const state = {
@@ -106,6 +134,11 @@ function newGame() {
 
 function say(text) {
   state.message = { text, t: 0 };
+}
+
+// Controller rumble, if you're playing with one and it's switched on in settings.
+function buzz(strong, weak, ms) {
+  if (input.usingPad && input.rumbleEnabled) rumble(strong, weak, ms);
 }
 
 function burst(x, y, n, color, speed) {
@@ -205,7 +238,7 @@ function land() {
   p.ly = l.y;
   W.startCrack(best, l.x, l.y);
   burst(p.x, p.y, 8, 'rgba(220,230,255,', 60);
-  if (input.usingPad) rumble(0.1, 0.3, 60);
+  buzz(0.1, 0.3, 60);
 }
 
 // Falling costs FALL_PENALTY vortex strength; you respawn where you fell.
@@ -224,7 +257,7 @@ function fall(consumed = false) {
     state.strength += C.FALL_PENALTY;
     W.setStrength(state.strength);
     state.cam.shake = 10;
-    if (input.usingPad) rumble(1, 0.6, 350);
+    buzz(1, 0.6, 350);
     say(`Fell! Vortex +${C.FALL_PENALTY}×`);
   }
 }
@@ -297,7 +330,7 @@ function updateTiles(dt) {
     burst(hit.x, hit.y, 3 + Math.round(k * 8), 'rgba(200,220,255,', 40 + k * 80);
     if (hit.a === p.tile || hit.b === p.tile) {
       state.cam.shake = Math.max(state.cam.shake, 2 + k * 8);
-      if (input.usingPad) rumble(0.3 + k * 0.6, 0.2, 80 + k * 120);
+      buzz(0.3 + k * 0.6, 0.2, 80 + k * 120);
     }
   }
   W.feedRim(state.tiles);
@@ -312,7 +345,7 @@ function updateScore(dt) {
     state.popups.push({ x: got.x, y: got.y, text: secs > 0 ? `+${secs}s` : 'calm', hue: 190 + deep * 120, t: 0 });
     state.pulses.push({ x: got.x, y: got.y, t: 0 });
     burst(got.x, got.y, 12 + Math.round(deep * 12), `hsla(${190 + deep * 120},90%,75%,`, 90);
-    if (input.usingPad) rumble(0, 0.5, 90);
+    buzz(0, 0.5, 90);
   }
   W.setStrength(state.strength);
 }
@@ -415,6 +448,10 @@ function handlePad() {
   updatePadPanel();
   if (setup.active) return;
   if (pad.active) input.usingPad = true;
+  if (!settingsCard.hidden) {
+    if (justPressed(BUTTON.B)) closeSettings();
+    return;
+  }
   if (state.mode !== 'play') {
     if (justPressed(BUTTON.A, BUTTON.START)) newGame();
     return;
@@ -487,23 +524,38 @@ canvas.addEventListener('pointerdown', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.mode === 'play' && !state.paused) togglePause();
 });
-// Show a controller hint on the title/game-over card, with a setup panel for
-// controllers whose sticks or buttons come out scrambled.
+// Settings screen (from the title and game-over cards). Its controller section
+// sets up controllers whose sticks or buttons come out scrambled.
+const mainCard = document.getElementById('main-card');
+const settingsCard = document.getElementById('settings');
 const padHint = document.getElementById('pad-hint');
-const padPanel = document.getElementById('pad-panel');
 const padStep = document.getElementById('pad-step');
 const padReadoutEl = document.getElementById('pad-readout');
-window.addEventListener('gamepadconnected', () => { padHint.hidden = false; });
-window.addEventListener('gamepaddisconnected', () => { padHint.hidden = !pollGamepad().connected; });
-document.getElementById('pad-setup-open').addEventListener('click', () => { padPanel.hidden = false; });
+
+function openSettings() {
+  mainCard.hidden = true;
+  settingsCard.hidden = false;
+  overlay.scrollTop = 0;
+}
+
+function closeSettings() {
+  cancelSetup();
+  settingsCard.hidden = true;
+  mainCard.hidden = false;
+}
+
+document.getElementById('settings-open').addEventListener('click', openSettings);
+document.getElementById('settings-close').addEventListener('click', closeSettings);
 document.getElementById('pad-setup-start').addEventListener('click', startSetup);
 document.getElementById('pad-reset').addEventListener('click', () => { cancelSetup(); resetMapping(); });
-document.getElementById('pad-close').addEventListener('click', () => { cancelSetup(); padPanel.hidden = true; });
+window.addEventListener('gamepadconnected', () => { padHint.hidden = false; });
+window.addEventListener('gamepaddisconnected', () => { padHint.hidden = !pollGamepad().connected; });
 
 function updatePadPanel() {
-  if (padPanel.hidden) return;
-  padStep.textContent = setupPrompt() || 'If the sticks or buttons act strangely, press Start setup.';
-  padReadoutEl.textContent = padReadout();
+  if (settingsCard.hidden) return;
+  padStep.textContent = setupPrompt() ||
+    (pad.connected ? 'Controller detected. If the sticks or buttons act strangely, press Start setup.' : 'No controller detected yet. Connect one and press any button on it.');
+  padReadoutEl.textContent = pad.connected ? padReadout() : '';
 }
 window.addEventListener('resize', resize);
 playButton.addEventListener('click', newGame);
