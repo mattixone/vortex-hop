@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 18,                        // shown on the title screen; bump on every deploy
+  BUILD: 19,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -86,6 +86,10 @@ export const CONFIG = {
   DOUBLE_TAP_DIST: 70,              // ...and this close (px) to it
   AIM_DEADZONE: 20,                 // px of drag that does nothing (let go here to cancel)
   AIM_DRAG: 110,                    // px of drag for a full-length jump
+
+  // Game controller
+  PAD_DEADZONE: 0.2,                // left stick (walk)
+  PAD_AIM_DEADZONE: 0.25,           // right stick (aim); centred = cancel
   PLAYER_R: 10,
   FALL_TIME: 1.2,
 

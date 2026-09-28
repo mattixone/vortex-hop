@@ -432,8 +432,9 @@ function drawControls(ctx, state) {
   const L = getLayout();
   if (!L || state.mode !== 'play') return;
 
-  if (!input.aim) drawJoystick(ctx, L); // hidden while aiming a jump
-  if (input.sliderEnabled) drawSlider(ctx, L.slider);
+  // Touch hints hide while you're playing with a controller.
+  if (!input.aim && !(input.usingPad && !input.joy)) drawJoystick(ctx, L); // hidden while aiming a jump
+  if (input.sliderEnabled && !(input.usingPad && !input.slider)) drawSlider(ctx, L.slider);
   drawAimControl(ctx);
 }
 
@@ -587,4 +588,19 @@ export function render(canvas, state) {
   drawMinimap(ctx, state);
   drawHud(ctx, state);
   drawControls(ctx, state);
+  if (state.paused && state.mode === 'play') drawPaused(ctx, state);
+}
+
+function drawPaused(ctx, state) {
+  const { w, h } = state.view;
+  ctx.fillStyle = 'rgba(5,6,13,0.65)';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 34px system-ui, sans-serif';
+  ctx.fillText('Paused', w / 2, h * 0.42);
+  ctx.font = '15px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(220,230,255,0.8)';
+  ctx.fillText(input.usingPad ? 'Start to resume · Y to restart' : 'Tap to resume', w / 2, h * 0.42 + 40);
 }

@@ -11,7 +11,10 @@ No build step and no dependencies: just `index.html` and the files in `js/`.
 | Walk | Drag anywhere with one thumb (left half only when the jump slider is on) | Arrows or WASD |
 | Jump (double-tap and drag) | Tap, then tap again and hold, and drag the way you want to jump. Drag distance sets jump distance (the landing marker is green when a tile is under it). Let go to jump; let go in the red centre to cancel. | Hold Space (fills the slider), Esc cancels |
 | Jump slider (optional setting) | Slider appears under your right thumb. Slide up = further, down into the red = cancel, let go = jump. | Hold Space (fills the slider), Esc cancels |
+| Pause | Switching apps pauses; tap to resume | P |
 | Restart | | R |
+
+**Game controller** (Xbox, PlayStation, Switch Pro and most others, including on iPhone/iPad): left stick walks, right stick aims a jump (tilt = direction and distance, centre = cancel), A / RB / RT jumps, Start pauses (then Start resumes, Y restarts). A or Start plays from the title screen. Rumble on landings, pickups, falls and hits where the browser supports it.
 
 Directions are relative to the screen. When you stop walking, the view swings round so you're facing up the screen, and a small gold arrow next to you always points to the rim. The camera zooms in when you're on smaller tiles. Walking off your tile's edge steps you onto any tile that overlaps it (or nearly touches it); otherwise you slide along the edge.
 
@@ -32,7 +35,8 @@ npx serve .        # or: python3 -m http.server
 | `js/world.js` | Tile motion, cracking, shattering, keeping the vortex stocked. |
 | `js/physics.js` | Tile-on-tile collisions (convex polygons, impulses, spin). |
 | `js/pickups.js` | Pickups: spawning on tiles, riding along, collecting, depth-based value. |
-| `js/input.js` | On-screen joystick and jump slider, keyboard. |
+| `js/input.js` | On-screen joystick, double-tap-and-drag jump, jump slider, keyboard. |
+| `js/gamepad.js` | Game controller support (Gamepad API). |
 | `js/main.js` | Game state, walking, jumping, main loop. |
 | `js/render.js` | Drawing: vortex, tiles, player, minimap, HUD, controls. |
 
@@ -53,6 +57,7 @@ npx serve .        # or: python3 -m http.server
 - [x] Pickups on tiles calm the vortex; the deeper they are, the more time they buy
 - [x] Edge-of-screen arrows point to the nearest off-screen pickups
 - [x] One-handed double-tap-and-drag jump; joystick anywhere; jump slider as an optional setting
+- [x] Game controller support and pause (auto-pauses when you switch apps)
 - [ ] Tuning: map size, starting zone, strength curve, pickup count and values
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds

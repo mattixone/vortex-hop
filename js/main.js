@@ -5,6 +5,7 @@ import * as W from './world.js';
 import { render, formatTime } from './render.js';
 import { collide } from './physics.js';
 import { updatePickups, rehome } from './pickups.js';
+import { pad, pollGamepad, justPressed, rumble, BUTTON } from './gamepad.js';
 import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill, aimVector } from './input.js';
 
 const canvas = document.getElementById('game');
@@ -56,6 +57,7 @@ const state = {
   walking: false,        // joystick/keys held this frame (the camera waits until you stop)
   aimOnTile: false,      // is there a tile under the landing marker right now?
   view: { w: 0, h: 0, dpr: 1 },
+  paused: false,
 };
 window.game = state; // handy for poking at from the dev console
 
@@ -97,6 +99,7 @@ function newGame() {
   state.cam.angle = -Math.PI / 2 - Math.atan2(state.face.y, state.face.x);
   state.cam.zoom = zoomFor(state.player.tile);
   state.mode = 'play';
+  state.paused = false;
   overlay.hidden = true;
   say('Survive the vortex');
 }
@@ -202,6 +205,7 @@ function land() {
   p.ly = l.y;
   W.startCrack(best, l.x, l.y);
   burst(p.x, p.y, 8, 'rgba(220,230,255,', 60);
+  if (input.usingPad) rumble(0.1, 0.3, 60);
 }
 
 // Falling costs FALL_PENALTY vortex strength; you respawn where you fell.
@@ -220,6 +224,7 @@ function fall(consumed = false) {
     state.strength += C.FALL_PENALTY;
     W.setStrength(state.strength);
     state.cam.shake = 10;
+    if (input.usingPad) rumble(1, 0.6, 350);
     say(`Fell! Vortex +${C.FALL_PENALTY}×`);
   }
 }
@@ -290,7 +295,10 @@ function updateTiles(dt) {
   for (const hit of collide(state.tiles)) {
     const k = Math.min(1, hit.speed / 200);
     burst(hit.x, hit.y, 3 + Math.round(k * 8), 'rgba(200,220,255,', 40 + k * 80);
-    if (hit.a === p.tile || hit.b === p.tile) state.cam.shake = Math.max(state.cam.shake, 2 + k * 8);
+    if (hit.a === p.tile || hit.b === p.tile) {
+      state.cam.shake = Math.max(state.cam.shake, 2 + k * 8);
+      if (input.usingPad) rumble(0.3 + k * 0.6, 0.2, 80 + k * 120);
+    }
   }
   W.feedRim(state.tiles);
 }
@@ -304,16 +312,17 @@ function updateScore(dt) {
     state.popups.push({ x: got.x, y: got.y, text: secs > 0 ? `+${secs}s` : 'calm', hue: 190 + deep * 120, t: 0 });
     state.pulses.push({ x: got.x, y: got.y, t: 0 });
     burst(got.x, got.y, 12 + Math.round(deep * 12), `hsla(${190 + deep * 120},90%,75%,`, 90);
+    if (input.usingPad) rumble(0, 0.5, 90);
   }
   W.setStrength(state.strength);
 }
 
 function updatePlayer(dt) {
   const p = state.player;
-  const move = state.mode === 'play' ? moveVector() : null;
-  const aimDir = state.mode === 'play' ? aimVector() : null;
+  const move = state.mode === 'play' ? moveVector() || pad.move : null;
+  const aimDir = state.mode === 'play' ? aimVector() || pad.aim : null;
   // Aiming holds the camera still too, so the drag direction stays put on screen.
-  state.walking = !!move || !!input.aim;
+  state.walking = !!move || !!input.aim || !!pad.aim;
   if (aimDir) state.face = worldDir(aimDir);
   else if (move) state.face = worldDir(move); // facing is kept in world space
   if (p.mode === 'tile') {
@@ -399,10 +408,36 @@ function updateEffects(dt) {
 // ---- Loop ----
 
 let last = performance.now();
+// Controller buttons: A/Start to play; A/RB/RT to jump to the right-stick marker;
+// Start to pause, and from the pause screen Start resumes and Y restarts.
+function handlePad() {
+  pollGamepad();
+  if (pad.active) input.usingPad = true;
+  if (state.mode !== 'play') {
+    if (justPressed(BUTTON.A, BUTTON.START)) newGame();
+    return;
+  }
+  if (justPressed(BUTTON.START)) return togglePause();
+  if (state.paused) {
+    if (justPressed(BUTTON.Y)) newGame();
+    return;
+  }
+  if (pad.aim && justPressed(BUTTON.A, BUTTON.RB, BUTTON.RT)) jump(pad.aim.power, pad.aim);
+}
+
+function togglePause() {
+  if (state.mode !== 'play') return;
+  state.paused = !state.paused;
+  input.joy = input.aim = input.slider = null;
+}
+
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (state.mode === 'play') {
+  handlePad();
+  if (state.mode === 'play' && state.paused) {
+    // Frozen: just redraw.
+  } else if (state.mode === 'play') {
     state.time += dt;
     state.strength += C.STRENGTH_RATE * dt;
     W.setStrength(state.strength);
@@ -437,10 +472,23 @@ function resize() {
 }
 
 initInput(canvas, {
-  active: () => state.mode === 'play',
+  active: () => state.mode === 'play' && !state.paused,
   jump,
   restart: newGame,
+  pause: togglePause,
 });
+// While paused, a tap resumes.
+canvas.addEventListener('pointerdown', () => {
+  if (state.mode === 'play' && state.paused) togglePause();
+});
+// Switching apps or locking the phone pauses the run.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.mode === 'play' && !state.paused) togglePause();
+});
+// Show a controller hint on the title/game-over card.
+const padHint = document.getElementById('pad-hint');
+window.addEventListener('gamepadconnected', () => { padHint.hidden = false; });
+window.addEventListener('gamepaddisconnected', () => { padHint.hidden = !pollGamepad().connected; });
 window.addEventListener('resize', resize);
 playButton.addEventListener('click', newGame);
 

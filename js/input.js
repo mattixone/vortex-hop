@@ -10,6 +10,7 @@ export const input = {
   // 1 at the top (longest jump) and negative when pulled down towards cancel.
   slider: null,
   keys: new Set(),
+  usingPad: false,         // last input came from a game controller (hides touch hints)
 };
 
 let layout = null;
@@ -96,6 +97,7 @@ export function aimVector() {
 // handlers: { active(), jump(power 0..1, screenDir?), restart() }
 export function initInput(canvas, handlers) {
   canvas.addEventListener('pointerdown', (e) => {
+    input.usingPad = false;
     if (!handlers.active()) return;
     e.preventDefault();
     const x = e.clientX, y = e.clientY;
@@ -175,6 +177,7 @@ export function initInput(canvas, handlers) {
   window.addEventListener('keydown', (e) => {
     const k = keyName(e);
     if (k === 'r') return handlers.restart();
+    if (k === 'p') return handlers.pause();
     if (k === ' ') {
       // Holding Space fills the slider up over CHARGE_TIME (see keyboardFill).
       e.preventDefault();
