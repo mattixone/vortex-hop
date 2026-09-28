@@ -210,35 +210,6 @@ function drawPickupArrows(ctx, state) {
   }
 }
 
-// Edge hop: outline the tile you're about to hop to and fill a ring at the landing spot.
-function drawHopTarget(ctx, state, px) {
-  const h = state.hop;
-  if (!h) return;
-  const t = h.tile, k = G.clamp(h.t / C.HOP_DELAY, 0, 1);
-  ctx.save();
-  ctx.translate(t.x, t.y);
-  ctx.rotate(t.angle);
-  tracePoly(ctx, t.poly);
-  ctx.lineWidth = (2 + k * 2) * px;
-  ctx.strokeStyle = `rgba(255,255,255,${0.35 + k * 0.6})`;
-  ctx.stroke();
-  ctx.restore();
-  const p = state.player;
-  ctx.setLineDash([5 * px, 6 * px]);
-  ctx.lineWidth = 1.5 * px;
-  ctx.strokeStyle = `rgba(255,255,255,${0.3 + k * 0.4})`;
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y);
-  ctx.lineTo(h.x, h.y);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.lineWidth = 3 * px;
-  ctx.strokeStyle = '#5affaa';
-  ctx.beginPath();
-  ctx.arc(h.x, h.y, 10 * px, -Math.PI / 2, -Math.PI / 2 + k * G.TAU);
-  ctx.stroke();
-}
-
 function drawCore(ctx) {
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, C.CORE_R * 3);
   g.addColorStop(0, 'rgba(0,0,0,1)');
@@ -263,7 +234,7 @@ function drawPlayer(ctx, state, px) {
   if (r <= 0) return;
 
   if (state.aim) {
-    // Charging: faint max-range ring, dashed line and a marker where you'll land.
+    // Charging (edge charge or slider): faint max-range ring, dashed line and a marker where you'll land.
     const a = state.aim;
     ctx.lineWidth = 1.5 * px;
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -277,11 +248,14 @@ function drawPlayer(ctx, state, px) {
     ctx.lineTo(a.x, a.y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.lineWidth = 2 * px;
-    ctx.strokeStyle = '#fff';
+    // Green when there's a tile under the marker right now (you still have to lead moving tiles).
+    ctx.globalAlpha = a.armed ? 1 : 0.45;
+    ctx.lineWidth = 2.5 * px;
+    ctx.strokeStyle = state.aimOnTile ? '#5affaa' : '#fff';
     ctx.beginPath();
     ctx.arc(a.x, a.y, 9 * px, 0, G.TAU);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
   if (p.mode === 'air') {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -560,7 +534,6 @@ export function render(canvas, state) {
     ctx.fillRect(q.x - 2 * px, q.y - 2 * px, 4 * px, 4 * px);
   }
   drawPickups(ctx, state, px);
-  drawHopTarget(ctx, state, px);
   drawCore(ctx);
   drawPlayer(ctx, state, px);
   ctx.restore();

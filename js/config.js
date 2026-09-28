@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 15,                        // shown on the title screen; bump on every deploy
+  BUILD: 16,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -74,17 +74,15 @@ export const CONFIG = {
   STEP_REACH: 14,                   // can step over gaps this wide onto a neighbouring tile
   JUMP_MIN: 70,                     // jump slider at rest (a quick tap)
   JUMP_RANGE: 260,                  // jump slider pushed to the top
-  CHARGE_TIME: 0.8,                 // keyboard: seconds holding Space to fill the slider
+  CHARGE_TIME: 0.8,                 // seconds of charging (edge charge, or holding Space) to reach JUMP_RANGE
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
 
-  // Edge hop (one-handed jumping): push firmly into your tile's edge towards a
-  // tile within HOP_RANGE and, after HOP_DELAY, you hop onto where it will be.
-  HOP_RANGE: 140,
-  HOP_DELAY: 0.3,                   // seconds of pushing before the hop fires
-  HOP_AIR_TIME: 0.35,
-  HOP_CONE: 0.6,                    // rad: how far off your push direction a target can be
-  HOP_MIN_PUSH: 0.6,                // joystick must be pushed at least this far (0..1)
-  HOP_PROBE: 16,                    // px ahead of the player that must be off the tile to count as the edge
+  // Edge charge (one-handed jumping): push firmly into your tile's edge where
+  // there's a gap and a landing marker slides out from JUMP_MIN to JUMP_RANGE over
+  // CHARGE_TIME. Let go to jump there; slide back to the centre to cancel.
+  EDGE_PUSH: 0.6,                   // joystick must be pushed at least this far (0..1) to start charging
+  EDGE_PROBE: 16,                   // px ahead of the player that must be off the tile to count as the edge
+  CHARGE_MIN_HOLD: 0.2,             // letting go sooner than this cancels (so stopping at an edge is safe)
   PLAYER_R: 10,
   FALL_TIME: 1.2,
 

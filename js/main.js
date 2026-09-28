@@ -27,7 +27,7 @@ function saveBest(t) {
   try { localStorage.setItem(BEST_KEY, String(t)); } catch { /* private mode etc. */ }
 }
 
-// Optional two-handed jump slider (off by default; edge hop always works).
+// Optional two-handed jump slider (off by default; the edge charge always works).
 const sliderToggle = document.getElementById('slider-toggle');
 try { input.sliderEnabled = localStorage.getItem(SLIDER_KEY) === '1'; } catch { /* storage blocked */ }
 sliderToggle.checked = input.sliderEnabled;
@@ -54,7 +54,8 @@ const state = {
   aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
   walking: false,        // joystick/keys held this frame (the camera waits until you stop)
-  hop: null,             // edge hop being lined up: { tile, x, y, t } (x, y = predicted landing spot)
+  charge: null,          // edge charge in progress: { t, dir } (dir in world space)
+  aimOnTile: false,      // is there a tile under the landing marker right now?
   view: { w: 0, h: 0, dpr: 1 },
 };
 window.game = state; // handy for poking at from the dev console
@@ -90,7 +91,7 @@ function newGame() {
   state.pickups = [];
   state.popups = [];
   state.pulses = [];
-  state.hop = null;
+  state.charge = null;
   input.slider = null;
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
@@ -135,12 +136,13 @@ function walk(v, dt) {
   const p = state.player;
   const dir = worldDir(v);
   const step = C.WALK_SPEED * v.mag * dt;
-  // Close to the edge and pushing towards it? Line up an edge hop. (Probing a
-  // little ahead keeps this steady while you slide along the edge.)
-  if (!W.containsPoint(p.tile, p.x + dir.x * C.HOP_PROBE, p.y + dir.y * C.HOP_PROBE)) {
-    if (lineUpHop(dir, v, dt)) return;
-  } else {
-    state.hop = null;
+  // Pushing firmly into the edge where there's a gap starts an edge charge (feet
+  // planted from then on). If a tile is right there instead, walking steps across.
+  const ax = p.x + dir.x * C.EDGE_PROBE, ay = p.y + dir.y * C.EDGE_PROBE;
+  const bx = ax + dir.x * C.STEP_REACH, by = ay + dir.y * C.STEP_REACH;
+  if (v.mag >= C.EDGE_PUSH && !W.containsPoint(p.tile, ax, ay) && !tileAt(ax, ay, p.tile) && !tileAt(bx, by, p.tile)) {
+    state.charge = { t: 0, dir };
+    return;
   }
   for (const a of [0, 0.6, -0.6, 1.2, -1.2]) {
     const d = G.rotate(dir.x, dir.y, a);
@@ -153,63 +155,28 @@ function walk(v, dt) {
       if (rest && Math.hypot(p.lx - rest.x, p.ly - rest.y) > C.WAKE_DISTANCE) W.startCrack(p.tile, p.lx, p.ly);
       return;
     }
-    if (a === 0 && stepAcross(nx, ny, d)) {
-      state.hop = null;
-      return;
-    }
+    if (a === 0 && stepAcross(nx, ny, d)) return;
   }
 }
 
-// Where a tile will be after `secs` (drift only; ignores knocks and collisions).
-function predict(tile, secs) {
-  const q = { x: tile.x, y: tile.y };
-  const steps = 6;
-  for (let i = 0; i < steps; i++) W.driftPoint(q, tile.area, secs / steps);
-  return { x: q.x, y: q.y, angle: tile.angle + tile.spin * secs };
+// The first non-rubble tile under (x, y), other than `except`.
+function tileAt(x, y, except = null) {
+  for (const t of state.tiles) if (t !== except && !t.rubble && W.containsPoint(t, x, y)) return t;
+  return null;
 }
 
-// Best tile to hop to when pushing into the edge in world direction `dir`.
-// Aims a little inside the tile from its predicted centre, towards the player.
-function findHopTarget(dir) {
-  const p = state.player;
-  let best = null, bestScore = Infinity;
-  for (const t of state.tiles) {
-    if (t === p.tile || t.rubble) continue;
-    if (Math.hypot(t.x - p.x, t.y - p.y) > C.HOP_RANGE + t.radius + 60) continue;
-    const f = predict(t, C.HOP_AIR_TIME);
-    const cx = f.x - p.x, cy = f.y - p.y, dc = Math.hypot(cx, cy) || 1;
-    const pull = Math.min(t.radius * 0.4, dc * 0.5);
-    let x = f.x - (cx / dc) * pull, y = f.y - (cy / dc) * pull;
-    const l = G.rotate(x - f.x, y - f.y, -f.angle);
-    if (!G.pointInPolygon(l.x, l.y, t.poly)) { x = f.x; y = f.y; }
-    const dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
-    if (d > C.HOP_RANGE) continue;
-    const off = Math.acos(G.clamp((dx * dir.x + dy * dir.y) / (d || 1), -1, 1));
-    if (off > C.HOP_CONE) continue;
-    const score = d * (1 + off * 1.5);
-    if (score < bestScore) { bestScore = score; best = { tile: t, x, y }; }
-  }
-  return best;
+// Distance of an edge-charge jump after charging for `t` seconds.
+function chargeDistance(t) {
+  return jumpDistance(G.clamp((t - C.CHARGE_MIN_HOLD) / C.CHARGE_TIME, 0, 1));
 }
 
-// Pushing firmly into the edge towards a reachable tile lines up a hop;
-// holding it for HOP_DELAY fires it. Returns true if the player hopped.
-function lineUpHop(dir, v, dt) {
-  if (v.mag < C.HOP_MIN_PUSH) { state.hop = null; return false; }
-  const target = findHopTarget(dir);
-  if (!target) { state.hop = null; return false; }
-  const h = state.hop && state.hop.tile === target.tile ? state.hop : { t: 0 };
-  state.hop = { ...target, t: h.t + dt };
-  if (state.hop.t < C.HOP_DELAY) return false;
-  const p = state.player;
-  const hopTarget = target;
-  state.hop = null;
-  const dx = hopTarget.x - p.x, dy = hopTarget.y - p.y;
-  state.face = { x: dx / (Math.hypot(dx, dy) || 1), y: dy / (Math.hypot(dx, dy) || 1) };
-  p.mode = 'air';
-  p.tile = null;
-  p.jump = { sx: p.x, sy: p.y, tx: hopTarget.x, ty: hopTarget.y, t: 0, dur: C.HOP_AIR_TIME, target: hopTarget.tile };
-  return true;
+// Thumb lifted (or keys released) while charging: jump, unless it was just a quick stop.
+function releaseCharge() {
+  const c = state.charge;
+  state.charge = null;
+  if (c.t < C.CHARGE_MIN_HOLD) return;
+  state.face = c.dir;
+  jump(G.clamp((c.t - C.CHARGE_MIN_HOLD) / C.CHARGE_TIME, 0, 1));
 }
 
 function stepAcross(nx, ny, d) {
@@ -238,7 +205,7 @@ function jump(power) {
   const d = jumpDistance(power), f = state.face;
   p.mode = 'air';
   p.tile = null;
-  p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0, dur: C.AIR_TIME, target: null };
+  p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0, dur: C.AIR_TIME };
 }
 
 function land() {
@@ -248,7 +215,6 @@ function land() {
   for (const t of state.tiles) {
     if (!t.rubble && W.containsPoint(t, p.x, p.y) && (!best || t.area < best.area)) best = t;
   }
-  if (!best) best = forgiveLanding(p);
   if (!best) return fall();
   const l = W.toLocal(best, p.x, p.y);
   p.mode = 'tile';
@@ -261,23 +227,6 @@ function land() {
 
 // Falling costs FALL_PENALTY vortex strength; you respawn where you fell.
 // `consumed` is the vortex reaching STRENGTH_MAX: no penalty, the run just ends.
-// A hop aimed at a tile that got knocked slightly aside still lands on it:
-// if the target is close, slide the landing point towards its centre.
-function forgiveLanding(p) {
-  const t = p.jump && p.jump.target;
-  if (!t || t.rubble || !state.tiles.includes(t)) return null;
-  if (Math.hypot(p.x - t.x, p.y - t.y) > t.radius + 25) return null;
-  for (let i = 1; i <= 6; i++) {
-    const x = G.lerp(p.x, t.x, i / 6), y = G.lerp(p.y, t.y, i / 6);
-    if (W.containsPoint(t, x, y)) {
-      p.x = x;
-      p.y = y;
-      return t;
-    }
-  }
-  return null;
-}
-
 function fall(consumed = false) {
   const p = state.player;
   p.mode = 'falling';
@@ -285,6 +234,7 @@ function fall(consumed = false) {
   p.fallT = 0;
   p.fellAt = { x: p.x, y: p.y };
   input.slider = null;
+  state.charge = null;
   if (state.mode !== 'play') return;
   if (consumed) {
     say('The vortex consumed you');
@@ -384,13 +334,24 @@ function updatePlayer(dt) {
   const p = state.player;
   const move = state.mode === 'play' ? moveVector() : null;
   state.walking = !!move;
-  if (!move || p.mode !== 'tile') state.hop = null;
-  if (move) state.face = worldDir(move); // facing is kept in world space
+  if (state.charge && (p.mode !== 'tile' || state.mode !== 'play')) state.charge = null;
+  if (state.charge) {
+    if (move) {
+      state.charge.t += dt;
+      state.charge.dir = worldDir(move); // aim follows your thumb
+    } else if (input.joy) {
+      state.charge = null; // thumb slid back to the centre: cancel
+    } else {
+      releaseCharge(); // thumb lifted (or keys released): jump
+    }
+  }
+  if (state.charge) state.face = state.charge.dir;
+  else if (move) state.face = worldDir(move); // facing is kept in world space
   if (p.mode === 'tile') {
     const w = W.toWorld(p.tile, p.lx, p.ly);
     p.x = w.x;
     p.y = w.y;
-    if (move) walk(move, dt);
+    if (move && !state.charge) walk(move, dt);
   } else if (p.mode === 'air') {
     const j = p.jump;
     j.t += dt;
@@ -408,12 +369,16 @@ function updatePlayer(dt) {
 
   keyboardFill(dt);
   const sl = input.slider;
-  if (sl && !sliderCancelled(sl) && p.mode === 'tile') {
+  if (state.charge && p.mode === 'tile') {
+    const d = chargeDistance(state.charge.t);
+    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d, armed: state.charge.t >= C.CHARGE_MIN_HOLD };
+  } else if (sl && !sliderCancelled(sl) && p.mode === 'tile') {
     const d = jumpDistance(G.clamp(sl.s, 0, 1));
-    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d };
+    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d, armed: true };
   } else {
     state.aim = null;
   }
+  state.aimOnTile = !!(state.aim && tileAt(state.aim.x, state.aim.y, p.tile));
 
   state.trailTimer -= dt;
   if (state.trailTimer <= 0 && p.mode !== 'falling') {
