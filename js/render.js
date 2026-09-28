@@ -3,6 +3,7 @@ import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import { speedFactor } from './world.js';
 import { input, getLayout, sliderCancelled } from './input.js';
+import { calmAt } from './pickups.js';
 
 export function formatTime(t) {
   const m = Math.floor(t / 60), s = t - m * 60;
@@ -127,6 +128,54 @@ function drawTile(ctx, t, px) {
     ctx.restore();
   }
   ctx.restore();
+}
+
+// Glowing orbs: cyan near the rim, magenta deep in the vortex. Bigger when worth more.
+function drawPickups(ctx, state, px) {
+  const now = performance.now() / 1000;
+  for (const k of state.pickups) {
+    const deep = calmAt(k.x, k.y) / C.CALM_MAX;
+    const hue = 190 + deep * 120;
+    const r = 10 + deep * 8;
+    const pulse = 1 + 0.15 * Math.sin(now * 5 + k.lx);
+    const g = ctx.createRadialGradient(k.x, k.y, 0, k.x, k.y, r * 3 * pulse);
+    g.addColorStop(0, `hsla(${hue},100%,75%,0.9)`);
+    g.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(k.x, k.y, r * 3 * pulse, 0, G.TAU);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(k.x, k.y, r * 0.55, 0, G.TAU);
+    ctx.fill();
+  }
+  for (const q of state.pulses) {
+    ctx.lineWidth = (6 - q.t * 5) * px;
+    ctx.strokeStyle = `rgba(160,220,255,${0.7 * (1 - q.t)})`;
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, 20 + q.t * 260, 0, G.TAU);
+    ctx.stroke();
+  }
+}
+
+function worldToScreen(state, x, y) {
+  const s = viewScale(state), o = viewOrigin(state), cam = state.cam;
+  const p = G.rotate(x - cam.x, y - cam.y, cam.angle);
+  return { x: o.x + p.x * s, y: o.y + p.y * s };
+}
+
+function drawPopups(ctx, state) {
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 20px system-ui, sans-serif';
+  for (const q of state.popups) {
+    const p = worldToScreen(state, q.x, q.y);
+    ctx.globalAlpha = Math.min(1, (1.4 - q.t) * 2);
+    ctx.fillStyle = `hsl(${q.hue},100%,80%)`;
+    ctx.fillText(q.text, p.x, p.y - 20 - q.t * 40);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawCore(ctx) {
@@ -272,6 +321,10 @@ function drawMinimap(ctx, state) {
       pen = true;
     }
     ctx.stroke();
+  }
+  for (const k of state.pickups) {
+    ctx.fillStyle = `hsl(${190 + (calmAt(k.x, k.y) / C.CALM_MAX) * 120},100%,70%)`;
+    ctx.fillRect(cx + k.x * s - 1.5, cy + k.y * s - 1.5, 3, 3);
   }
   const p = state.player;
   ctx.fillStyle = '#fff';
@@ -441,10 +494,12 @@ export function render(canvas, state) {
     ctx.fillStyle = `${q.color}${(q.life / q.max).toFixed(2)})`;
     ctx.fillRect(q.x - 2 * px, q.y - 2 * px, 4 * px, 4 * px);
   }
+  drawPickups(ctx, state, px);
   drawCore(ctx);
   drawPlayer(ctx, state, px);
   ctx.restore();
 
+  drawPopups(ctx, state);
   drawMinimap(ctx, state);
   drawHud(ctx, state);
   drawControls(ctx, state);

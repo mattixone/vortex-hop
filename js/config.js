@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 11,                        // shown on the title screen; bump on every deploy
+  BUILD: 12,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -12,6 +12,18 @@ export const CONFIG = {
   // swirl and inward pull (1 = normal).
   STRENGTH_START: 1,
   STRENGTH_RATE: 0.01,              // added per second
+
+  // Pickups: each one takes vortex strength away. The amount grows with depth:
+  // CALM_MIN at the rim up to CALM_MAX at the core (curved by CALM_CURVE).
+  // In seconds of vortex growth that's CALM / STRENGTH_RATE (e.g. 0.15 = 15s).
+  PICKUP_COUNT: 8,                  // kept alive around the player
+  PICKUP_RADIUS: 24,                // how close you must get to collect one
+  PICKUP_SPAWN_MIN: 150,            // spawn this far from the player...
+  PICKUP_SPAWN_MAX: 1100,           // ...but no further
+  PICKUP_FORGET: 2200,              // pickups this far away are recycled
+  CALM_MIN: 0.03,
+  CALM_MAX: 0.25,
+  CALM_CURVE: 2,
 
   // Vortex motion:
   //   speedFactor = sqrt(REF_AREA / area)            (small tiles are faster)

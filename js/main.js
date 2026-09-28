@@ -4,6 +4,7 @@ import * as G from './geometry.js';
 import * as W from './world.js';
 import { render, formatTime } from './render.js';
 import { collide } from './physics.js';
+import { updatePickups, rehome } from './pickups.js';
 import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill } from './input.js';
 
 const canvas = document.getElementById('game');
@@ -32,6 +33,9 @@ const state = {
   time: 0,               // seconds survived this run (the score)
   bestTime: loadBest(),
   strength: C.STRENGTH_START,
+  pickups: [],
+  popups: [],            // floating "+12s" texts: { x, y, text, hue, t }
+  pulses: [],            // calm rings spreading from where you grabbed a pickup: { x, y, t }
   particles: [],
   trail: [],
   trailTimer: 0,
@@ -72,6 +76,9 @@ function newGame() {
   W.setStrength(state.strength);
   state.particles = [];
   state.trail = [];
+  state.pickups = [];
+  state.popups = [];
+  state.pulses = [];
   input.slider = null;
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
@@ -227,6 +234,7 @@ function updateTiles(dt) {
         }
         state.cam.shake = 8;
       }
+      rehome(state, t, frags);
       for (const f of frags) { delete f.srcCell; next.push(f); }
       continue;
     }
@@ -246,6 +254,19 @@ function updateTiles(dt) {
     if (hit.a === p.tile || hit.b === p.tile) state.cam.shake = Math.max(state.cam.shake, 2 + k * 8);
   }
   W.feedRim(state.tiles);
+}
+
+function updateScore(dt) {
+  for (const got of updatePickups(state, dt, new Set(state.tiles))) {
+    const before = state.strength;
+    state.strength = Math.max(C.STRENGTH_START, state.strength - got.calm);
+    const secs = Math.round((before - state.strength) / C.STRENGTH_RATE);
+    const deep = got.calm / C.CALM_MAX;
+    state.popups.push({ x: got.x, y: got.y, text: secs > 0 ? `+${secs}s` : 'calm', hue: 190 + deep * 120, t: 0 });
+    state.pulses.push({ x: got.x, y: got.y, t: 0 });
+    burst(got.x, got.y, 12 + Math.round(deep * 12), `hsla(${190 + deep * 120},90%,75%,`, 90);
+  }
+  W.setStrength(state.strength);
 }
 
 function updatePlayer(dt) {
@@ -317,6 +338,10 @@ function updateEffects(dt) {
     q.life -= dt;
   }
   state.particles = state.particles.filter((q) => q.life > 0);
+  for (const q of state.popups) q.t += dt;
+  state.popups = state.popups.filter((q) => q.t < 1.4);
+  for (const q of state.pulses) q.t += dt;
+  state.pulses = state.pulses.filter((q) => q.t < 1);
   if (state.message) {
     state.message.t += dt;
     if (state.message.t > 2.5) state.message = null;
@@ -335,6 +360,7 @@ function frame(now) {
     W.setStrength(state.strength);
     updateTiles(dt);
     updatePlayer(dt);
+    updateScore(dt);
     updateCamera(dt);
     updateEffects(dt);
   } else {

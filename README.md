@@ -30,6 +30,7 @@ npx serve .        # or: python3 -m http.server
 | `js/geometry.js` | Polygon helpers and the Voronoi clipping. |
 | `js/world.js` | Tile motion, cracking, shattering, keeping the vortex stocked. |
 | `js/physics.js` | Tile-on-tile collisions (convex polygons, impulses, spin). |
+| `js/pickups.js` | Pickups: spawning on tiles, riding along, collecting, depth-based value. |
 | `js/input.js` | On-screen joystick and jump slider, keyboard. |
 | `js/main.js` | Game state, walking, jumping, main loop. |
 | `js/render.js` | Drawing: vortex, tiles, player, minimap, HUD, controls. |
@@ -48,6 +49,7 @@ npx serve .        # or: python3 -m http.server
 - [x] Camera turns to your facing direction when you stop; zoom follows tile size
 - [x] Tiles collide and bump each other instead of overlapping
 - [x] Survival run: the vortex strengthens over time, a fall ends the run, best time saved on the device
+- [x] Pickups on tiles calm the vortex; the deeper they are, the more time they buy
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones
