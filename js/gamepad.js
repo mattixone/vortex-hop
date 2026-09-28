@@ -4,6 +4,7 @@
 // the common layouts, and a "Set up controller" flow that records a custom
 // mapping per controller.
 import { CONFIG as C } from './config.js';
+import { snapJump } from './input.js';
 
 export const BUTTON = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9 };
 
@@ -162,7 +163,7 @@ export function pollGamepad() {
   const L = layout(gp);
   pad.move = stick(axisValue(gp, L.lx, L.auto), axisValue(gp, L.ly, L.auto), C.PAD_DEADZONE);
   const a = stick(axisValue(gp, L.rx, L.auto), axisValue(gp, L.ry, L.auto), C.PAD_AIM_DEADZONE);
-  pad.aim = a && { x: a.x, y: a.y, power: a.mag };
+  pad.aim = a && { x: a.x, y: a.y, ...snapJump(a.mag) }; // same short/medium/long snapping as touch
   gp.buttons.forEach((b, i) => {
     const down = b.pressed || b.value > 0.5;
     if (down && !prev[i]) {

@@ -2,7 +2,7 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import { speedFactor } from './world.js';
-import { input, getLayout, sliderCancelled } from './input.js';
+import { input, getLayout, sliderCancelled, aimVector } from './input.js';
 import { calmAt } from './pickups.js';
 
 export function formatTime(t) {
@@ -443,8 +443,8 @@ function drawControls(ctx, state) {
 function drawAimControl(ctx) {
   const a = input.aim;
   if (!a) return;
+  const v = aimVector();
   const dx = a.x - a.ox, dy = a.y - a.oy, d = Math.hypot(dx, dy);
-  const cancel = d < C.AIM_DEADZONE;
   const k = Math.min(1, d / C.AIM_DRAG);
   const kx = a.ox + (d ? (dx / d) * k * C.AIM_DRAG : 0), ky = a.oy + (d ? (dy / d) * k * C.AIM_DRAG : 0);
   ctx.lineWidth = 2;
@@ -454,27 +454,37 @@ function drawAimControl(ctx) {
   ctx.arc(a.ox, a.oy, C.AIM_DRAG, 0, G.TAU);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = cancel ? 'rgba(255,90,90,0.5)' : 'rgba(255,90,90,0.18)';
+  // Band edges: short | medium | long
+  const band = (C.AIM_DRAG - C.AIM_DEADZONE) / 3;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  for (const r of [C.AIM_DEADZONE + band, C.AIM_DEADZONE + band * 2]) {
+    ctx.beginPath();
+    ctx.arc(a.ox, a.oy, r, 0, G.TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = v ? 'rgba(255,90,90,0.18)' : 'rgba(255,90,90,0.5)';
   ctx.beginPath();
   ctx.arc(a.ox, a.oy, C.AIM_DEADZONE, 0, G.TAU);
   ctx.fill();
-  if (!cancel) {
-    ctx.strokeStyle = k >= 1 ? '#fff' : '#5affaa';
+  const colour = !v ? '#ff6b6b' : v.level === 2 ? '#fff' : '#5affaa';
+  if (v) {
+    ctx.strokeStyle = colour;
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(a.ox, a.oy);
     ctx.lineTo(kx, ky);
     ctx.stroke();
   }
-  ctx.fillStyle = cancel ? '#ff6b6b' : k >= 1 ? '#fff' : '#5affaa';
+  ctx.fillStyle = colour;
   ctx.beginPath();
   ctx.arc(kx, ky, 18, 0, G.TAU);
   ctx.fill();
   ctx.fillStyle = '#05201a';
-  ctx.font = '700 11px system-ui, sans-serif';
+  ctx.font = '800 15px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(cancel ? '✕' : 'JUMP', kx, ky);
+  ctx.fillText(v ? 'SML'[v.level] : '✕', kx, ky);
 }
 
 function roundedRect(ctx, x, y, w, h, r) {

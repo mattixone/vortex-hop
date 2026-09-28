@@ -84,14 +84,35 @@ export function keyboardFill(dt) {
 
 let lastTap = null; // { t, x, y } of the last quick tap, for spotting a double tap
 
-// The jump being aimed, in screen space: direction and power (0..1), or null when
-// the thumb is inside the dead zone (letting go there cancels).
+// Snaps a 0..1 aim amount to short / medium / long (equal thirds). Returns the
+// band (0, 1, 2) and the matching jump power for jump().
+export function snapJump(amount) {
+  const level = Math.min(2, Math.floor(G.clamp(amount, 0, 1) * 3));
+  const d = C.JUMP_SNAPS[level];
+  return { level, power: (d - C.JUMP_MIN) / (C.JUMP_RANGE - C.JUMP_MIN) };
+}
+
+let lastLevel = -1;
+
+// The jump being aimed, in screen space: direction, snapped power and band, or
+// null when the thumb is inside the dead zone (letting go there cancels).
 export function aimVector() {
   const a = input.aim;
   if (!a) return null;
   const dx = a.x - a.ox, dy = a.y - a.oy, d = Math.hypot(dx, dy);
   if (d < C.AIM_DEADZONE) return null;
-  return { x: dx / d, y: dy / d, power: G.clamp((d - C.AIM_DEADZONE) / (C.AIM_DRAG - C.AIM_DEADZONE), 0, 1) };
+  const snap = snapJump((d - C.AIM_DEADZONE) / (C.AIM_DRAG - C.AIM_DEADZONE));
+  return { x: dx / d, y: dy / d, power: snap.power, level: snap.level };
+}
+
+// A tiny buzz when the drag crosses into a new band (Android; iPhone ignores it).
+function tickOnBandChange() {
+  const v = aimVector();
+  const level = v ? v.level : -1;
+  if (level !== lastLevel && level >= 0) {
+    try { navigator.vibrate?.(8); } catch { /* not supported */ }
+  }
+  lastLevel = level;
 }
 
 // handlers: { active(), jump(power 0..1, screenDir?), restart() }
@@ -131,6 +152,7 @@ export function initInput(canvas, handlers) {
     if (a && e.pointerId === a.id) {
       a.x = e.clientX;
       a.y = e.clientY;
+      tickOnBandChange();
       return;
     }
     const sl = input.slider;

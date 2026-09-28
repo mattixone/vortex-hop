@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 20,                        // shown on the title screen; bump on every deploy
+  BUILD: 21,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -74,6 +74,9 @@ export const CONFIG = {
   STEP_REACH: 14,                   // can step over gaps this wide onto a neighbouring tile
   JUMP_MIN: 70,                     // jump slider at rest (a quick tap)
   JUMP_RANGE: 260,                  // jump slider pushed to the top
+  // Double-tap-and-drag and the controller's right stick snap to these three
+  // distances (short, medium, long); the drag is split into three equal bands.
+  JUMP_SNAPS: [90, 170, 260],
   CHARGE_TIME: 0.8,                 // keyboard: seconds holding Space to reach JUMP_RANGE
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
 
