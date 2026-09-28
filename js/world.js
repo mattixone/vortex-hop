@@ -3,6 +3,11 @@ import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 
 let nextId = 1;
+let strength = 1; // vortex strength multiplier, set by the game each frame
+
+export function setStrength(s) {
+  strength = s;
+}
 
 function tileFromPoly(x, y, poly, angle) {
   const area = G.polygonArea(poly);
@@ -32,7 +37,7 @@ export function speedFactor(area) {
 
 // Angular and radial speed for something of `area` at radius `r`.
 export function vortexVelocity(r, area) {
-  const w = C.BASE_SPIN * speedFactor(area) * Math.pow(C.R_REF / Math.max(r, 60), C.SPIN_FALLOFF);
+  const w = strength * C.BASE_SPIN * speedFactor(area) * Math.pow(C.R_REF / Math.max(r, 60), C.SPIN_FALLOFF);
   return { w, vr: -C.INWARD_PULL * r * w };
 }
 

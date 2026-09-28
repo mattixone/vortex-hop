@@ -4,6 +4,11 @@ import * as G from './geometry.js';
 import { speedFactor } from './world.js';
 import { input, getLayout, sliderCancelled } from './input.js';
 
+export function formatTime(t) {
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return `${m}:${s.toFixed(1).padStart(4, '0')}`;
+}
+
 // Colour scale: speed factor 0.8 (big, slow) is blue, SPEED_FACTOR_MAX (tiny, fast) is orange.
 const MIN_SF = Math.log(0.8), MAX_SF = Math.log(C.SPEED_FACTOR_MAX);
 
@@ -46,31 +51,22 @@ function drawSpiralArms(ctx, state, px) {
   }
 }
 
+// Depth bands: the closer to the core, the more dangerous (and later, the more valuable).
 function drawRings(ctx, state, px) {
+  ctx.lineWidth = 3 * px;
+  ctx.setLineDash([30 * px, 18 * px]);
   C.RINGS.forEach((r, i) => {
-    const passed = i < state.checkpoint;
-    ctx.lineWidth = (passed ? 3 : 5) * px;
-    ctx.strokeStyle = passed ? 'rgba(90,255,170,0.25)' : 'rgba(90,255,170,0.6)';
-    ctx.setLineDash(passed ? [] : [30 * px, 18 * px]);
+    ctx.strokeStyle = `rgba(90,255,170,${0.15 + 0.1 * (C.RINGS.length - i) / C.RINGS.length})`;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, G.TAU);
     ctx.stroke();
   });
   ctx.setLineDash([]);
-  ctx.lineWidth = 8 * px;
-  ctx.strokeStyle = 'rgba(255,215,100,0.8)';
+  ctx.lineWidth = 4 * px;
+  ctx.strokeStyle = 'rgba(255,215,100,0.25)';
   ctx.beginPath();
   ctx.arc(0, 0, C.RIM, 0, G.TAU);
   ctx.stroke();
-
-  for (const pulse of state.pulses) {
-    const k = pulse.t / 1.5;
-    ctx.lineWidth = (4 + 30 * k) * px;
-    ctx.strokeStyle = `rgba(90,255,170,${0.7 * (1 - k)})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, pulse.r, 0, G.TAU);
-    ctx.stroke();
-  }
 }
 
 function drawTile(ctx, t, px) {
@@ -242,8 +238,8 @@ function drawMinimap(ctx, state) {
   ctx.stroke();
   ctx.clip();
 
-  C.RINGS.forEach((r, i) => {
-    ctx.strokeStyle = i < state.checkpoint ? 'rgba(90,255,170,0.3)' : 'rgba(90,255,170,0.7)';
+  C.RINGS.forEach((r) => {
+    ctx.strokeStyle = 'rgba(90,255,170,0.4)';
     ctx.beginPath();
     ctx.arc(cx, cy, r * s, 0, G.TAU);
     ctx.stroke();
@@ -287,31 +283,27 @@ function drawMinimap(ctx, state) {
 
 function drawHud(ctx, state) {
   if (state.mode === 'title') return;
-  const p = state.player;
-  const r = Math.hypot(p.x, p.y);
-  const zone = 1 + C.RINGS.filter((ring) => r >= ring).length;
-  const pct = Math.round(G.clamp(r / C.RIM, 0, 1) * 100);
-  const secs = Math.floor(state.time);
 
-  ctx.fillStyle = 'rgba(220,230,255,0.9)';
-  ctx.font = '600 15px system-ui, sans-serif';
+  // Time survived (the score) and personal best
+  ctx.fillStyle = '#fff';
+  ctx.font = '700 28px system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(`Zone ${zone}/${C.RINGS.length + 1}`, 14, 14);
+  ctx.fillText(formatTime(state.time), 14, 12);
   ctx.font = '13px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(220,230,255,0.7)';
-  ctx.fillText(`To the rim: ${pct}%`, 14, 36);
-  ctx.fillText(`Falls: ${state.falls}   ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, 14, 54);
+  ctx.fillText(state.bestTime > 0 ? `Best ${formatTime(state.bestTime)}` : 'No best yet', 14, 46);
 
-  // Progress bar with checkpoint notches
-  const bw = Math.min(220, state.view.w - 28), bx = 14, by = 76;
+  // Vortex strength meter: blue when calm, red when raging
+  const bw = Math.min(180, state.view.w * 0.4), bx = 14, by = 72;
+  const k = G.clamp((state.strength - 1) / 2, 0, 1); // full bar at 3x
+  ctx.font = '600 11px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(220,230,255,0.7)';
+  ctx.fillText(`VORTEX ×${state.strength.toFixed(2)}`, bx, by);
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(bx, by, bw, 4);
-  ctx.fillStyle = 'rgba(90,255,170,0.9)';
-  ctx.fillRect(bx, by, bw * G.clamp(r / C.RIM, 0, 1), 4);
-  ctx.fillStyle = 'rgba(255,215,100,0.8)';
-  ctx.fillRect(bx + bw * G.clamp(state.best / C.RIM, 0, 1) - 1, by - 3, 2, 10);
-  for (const ring of C.RINGS) ctx.fillRect(bx + bw * (ring / C.RIM) - 0.5, by - 2, 1, 8);
+  ctx.fillRect(bx, by + 16, bw, 6);
+  ctx.fillStyle = `hsl(${200 - k * 200},85%,60%)`;
+  ctx.fillRect(bx, by + 16, bw * Math.max(0.02, k), 6);
 
   if (state.message) {
     const m = state.message;

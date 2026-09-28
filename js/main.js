@@ -2,7 +2,7 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import * as W from './world.js';
-import { render } from './render.js';
+import { render, formatTime } from './render.js';
 import { collide } from './physics.js';
 import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill } from './input.js';
 
@@ -14,22 +14,27 @@ const overlayHelp = document.getElementById('overlay-help');
 const playButton = document.getElementById('play');
 document.getElementById('build').textContent = `build ${C.BUILD}`;
 
-// Radius you respawn at for each checkpoint (index 0 = the start).
-const CHECKPOINT_R = [C.START_R, ...C.RINGS.map((r) => r + 90)];
+const BEST_KEY = 'vortex-hop-best';
+
+function loadBest() {
+  try { return parseFloat(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; }
+}
+
+function saveBest(t) {
+  try { localStorage.setItem(BEST_KEY, String(t)); } catch { /* private mode etc. */ }
+}
 
 const state = {
-  mode: 'title',         // 'title' | 'play' | 'won'
+  mode: 'title',         // 'title' | 'play' | 'over'
   tiles: [],
   player: null,
   cam: { x: 0, y: 0, angle: 0, shake: 0, zoom: 1 },
-  checkpoint: 0,
-  best: 0,
-  falls: 0,
-  time: 0,
+  time: 0,               // seconds survived this run (the score)
+  bestTime: loadBest(),
+  strength: C.STRENGTH_START,
   particles: [],
   trail: [],
   trailTimer: 0,
-  pulses: [],            // expanding rings when a checkpoint is reached
   message: null,         // { text, t }
   aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
@@ -53,7 +58,7 @@ function spawnSafeTile(r) {
 
 function putPlayerOn(tile) {
   state.player = { mode: 'tile', tile, lx: 0, ly: 0, x: tile.x, y: tile.y, jump: null, fallT: 0 };
-  // Start facing outward, towards the rim.
+  // Start facing outward.
   const r = Math.hypot(tile.x, tile.y) || 1;
   state.face = { x: tile.x / r, y: tile.y / r };
 }
@@ -62,13 +67,11 @@ function newGame() {
   state.tiles = [];
   W.populate(state.tiles);
   putPlayerOn(spawnSafeTile(C.START_R));
-  state.checkpoint = 0;
-  state.best = C.START_R;
-  state.falls = 0;
   state.time = 0;
+  state.strength = C.STRENGTH_START;
+  W.setStrength(state.strength);
   state.particles = [];
   state.trail = [];
-  state.pulses = [];
   input.slider = null;
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
@@ -76,7 +79,7 @@ function newGame() {
   state.cam.zoom = zoomFor(state.player.tile);
   state.mode = 'play';
   overlay.hidden = true;
-  say('Reach the rim');
+  say('Survive the vortex');
 }
 
 function say(text) {
@@ -140,7 +143,6 @@ function stepAcross(nx, ny, d) {
   if (!next) return false;
   moveTo(next, x, y);
   W.startCrack(next, p.lx, p.ly); // stepping on a tile cracks it, just like landing
-  checkProgress();
   return true;
 }
 
@@ -173,7 +175,6 @@ function land() {
   p.ly = l.y;
   W.startCrack(best, l.x, l.y);
   burst(p.x, p.y, 8, 'rgba(220,230,255,', 60);
-  checkProgress();
 }
 
 function fall() {
@@ -181,35 +182,21 @@ function fall() {
   p.mode = 'falling';
   p.tile = null;
   p.fallT = 0;
-  state.falls++;
-  say('Lost to the vortex');
+  input.slider = null;
 }
 
-function respawn() {
-  putPlayerOn(spawnSafeTile(CHECKPOINT_R[state.checkpoint]));
-  state.trail.push(null); // break the minimap trail instead of drawing a line across
-  say(state.checkpoint ? `Back to checkpoint ${state.checkpoint}` : 'Try again');
-}
-
-function checkProgress() {
-  const p = state.player;
-  const r = Math.hypot(p.x, p.y);
-  state.best = Math.max(state.best, r);
-  for (let i = state.checkpoint; i < C.RINGS.length; i++) {
-    if (r >= C.RINGS[i]) {
-      state.checkpoint = i + 1;
-      state.pulses.push({ r: C.RINGS[i], t: 0 });
-      say(`Checkpoint ${i + 1}`);
-    }
+// A fall ends the run once the falling animation finishes.
+function gameOver() {
+  state.mode = 'over';
+  const newBest = state.time > state.bestTime;
+  if (newBest) {
+    state.bestTime = state.time;
+    saveBest(state.time);
   }
-  if (r >= C.RIM) win();
-}
-
-function win() {
-  state.mode = 'won';
-  const secs = Math.round(state.time);
-  overlayTitle.textContent = 'You escaped the vortex!';
-  overlayText.textContent = `${Math.floor(secs / 60)}m ${secs % 60}s · ${state.falls} fall${state.falls === 1 ? '' : 's'}`;
+  overlayTitle.textContent = newBest ? 'New best!' : 'Lost to the vortex';
+  overlayText.textContent = newBest
+    ? `You lasted ${formatTime(state.time)}`
+    : `You lasted ${formatTime(state.time)} · best ${formatTime(state.bestTime)}`;
   overlayHelp.hidden = true;
   playButton.textContent = 'Play again';
   overlay.hidden = false;
@@ -281,7 +268,7 @@ function updatePlayer(dt) {
   } else if (p.mode === 'falling') {
     p.fallT += dt;
     W.driftPoint(p, C.MIN_AREA, dt * 3); // sucked in fast, like the tiniest shard
-    if (p.fallT >= C.FALL_TIME) respawn();
+    if (p.fallT >= C.FALL_TIME && state.mode === 'play') gameOver();
   }
 
   keyboardFill(dt);
@@ -330,8 +317,6 @@ function updateEffects(dt) {
     q.life -= dt;
   }
   state.particles = state.particles.filter((q) => q.life > 0);
-  for (const pulse of state.pulses) pulse.t += dt;
-  state.pulses = state.pulses.filter((pulse) => pulse.t < 1.5);
   if (state.message) {
     state.message.t += dt;
     if (state.message.t > 2.5) state.message = null;
@@ -346,14 +331,18 @@ function frame(now) {
   last = now;
   if (state.mode === 'play') {
     state.time += dt;
+    state.strength += C.STRENGTH_RATE * dt;
+    W.setStrength(state.strength);
     updateTiles(dt);
     updatePlayer(dt);
     updateCamera(dt);
     updateEffects(dt);
-  } else if (state.mode === 'title') {
+  } else {
+    // Title and game-over screens: the vortex keeps swirling behind the card.
     updateTiles(dt);
     updatePlayer(dt);
     updateCamera(dt);
+    updateEffects(dt);
   }
   if (state.player) render(canvas, state);
   requestAnimationFrame(frame);

@@ -1,6 +1,6 @@
 # Vortex Hop
 
-A small browser game: hop between tiles drifting around a vortex and escape to the rim. Tiles break into Voronoi fragments where you land, and smaller fragments spin faster towards the centre.
+A small browser game: survive on tiles drifting around a vortex for as long as you can. The vortex keeps getting stronger, and a fall ends the run. Tiles break into Voronoi fragments where you land, and smaller fragments spin faster towards the centre.
 
 No build step and no dependencies: just `index.html` and the files in `js/`.
 
@@ -47,6 +47,7 @@ npx serve .        # or: python3 -m http.server
 - [x] Joystick + jump slider, walking between overlapping tiles
 - [x] Camera turns to your facing direction when you stop; zoom follows tile size
 - [x] Tiles collide and bump each other instead of overlapping
+- [x] Survival run: the vortex strengthens over time, a fall ends the run, best time saved on the device
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones

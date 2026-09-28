@@ -1,12 +1,17 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 10,                        // shown on the title screen; bump on every deploy
+  BUILD: 11,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
-  RIM: 4500,                        // reach this radius to win
+  RIM: 4500,                        // outer edge, where fresh tiles drift in
   CORE_R: 70,                       // tiles closer than this are swallowed
-  RINGS: [900, 1600, 2300, 3000, 3700], // checkpoint rings between start and rim
-  START_R: 260,
+  RINGS: [900, 1600, 2300, 3000, 3700], // depth bands (drawn as rings)
+  START_R: 1400,
+
+  // Survival: the vortex gets stronger over time. Strength multiplies every tile's
+  // swirl and inward pull (1 = normal).
+  STRENGTH_START: 1,
+  STRENGTH_RATE: 0.01,              // added per second
 
   // Vortex motion:
   //   speedFactor = sqrt(REF_AREA / area)            (small tiles are faster)
