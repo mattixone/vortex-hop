@@ -412,8 +412,9 @@ function drawHud(ctx, state) {
 // Joystick: sits at its home spot until a thumb lands.
 function drawJoystick(ctx, L) {
   const j = input.joy;
-  const base = j ? { x: j.ox, y: j.oy } : L.joyHome;
-  const knob = j ? { x: j.x, y: j.y } : L.joyHome;
+  const home = input.sliderEnabled ? L.joyHomeLeft : L.joyHome;
+  const base = j ? { x: j.ox, y: j.oy } : home;
+  const knob = j ? { x: j.x, y: j.y } : home;
   ctx.fillStyle = j ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)';
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 2;

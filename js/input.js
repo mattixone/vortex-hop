@@ -23,7 +23,11 @@ export function updateLayout(view) {
   const sliderW = R * 0.75, upLen = R * 1.8, cancelLen = R * 0.75;
   layout = {
     joyR: R,
-    joyHome: { x: pad + R, y: bottom - R },
+    // Where the joystick rests when untouched (you can grab it anywhere): bottom
+    // centre for one-handed play, or the middle of the left half when the jump
+    // slider takes the right half.
+    joyHome: { x: view.w / 2, y: bottom - R * 1.4 },
+    joyHomeLeft: { x: Math.max(pad + R, view.w / 4), y: bottom - R * 1.4 },
     slider: {
       w: sliderW,
       upLen,                              // rest → top
