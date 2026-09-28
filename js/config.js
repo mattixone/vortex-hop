@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 14,                        // shown on the title screen; bump on every deploy
+  BUILD: 15,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -76,6 +76,15 @@ export const CONFIG = {
   JUMP_RANGE: 260,                  // jump slider pushed to the top
   CHARGE_TIME: 0.8,                 // keyboard: seconds holding Space to fill the slider
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
+
+  // Edge hop (one-handed jumping): push firmly into your tile's edge towards a
+  // tile within HOP_RANGE and, after HOP_DELAY, you hop onto where it will be.
+  HOP_RANGE: 140,
+  HOP_DELAY: 0.3,                   // seconds of pushing before the hop fires
+  HOP_AIR_TIME: 0.35,
+  HOP_CONE: 0.6,                    // rad: how far off your push direction a target can be
+  HOP_MIN_PUSH: 0.6,                // joystick must be pushed at least this far (0..1)
+  HOP_PROBE: 16,                    // px ahead of the player that must be off the tile to count as the edge
   PLAYER_R: 10,
   FALL_TIME: 1.2,
 

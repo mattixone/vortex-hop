@@ -15,7 +15,9 @@ const overlayHelp = document.getElementById('overlay-help');
 const playButton = document.getElementById('play');
 document.getElementById('build').textContent = `build ${C.BUILD}`;
 
+
 const BEST_KEY = 'vortex-hop-best';
+const SLIDER_KEY = 'vortex-hop-slider';
 
 function loadBest() {
   try { return parseFloat(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; }
@@ -24,6 +26,15 @@ function loadBest() {
 function saveBest(t) {
   try { localStorage.setItem(BEST_KEY, String(t)); } catch { /* private mode etc. */ }
 }
+
+// Optional two-handed jump slider (off by default; edge hop always works).
+const sliderToggle = document.getElementById('slider-toggle');
+try { input.sliderEnabled = localStorage.getItem(SLIDER_KEY) === '1'; } catch { /* storage blocked */ }
+sliderToggle.checked = input.sliderEnabled;
+sliderToggle.addEventListener('change', () => {
+  input.sliderEnabled = sliderToggle.checked;
+  try { localStorage.setItem(SLIDER_KEY, input.sliderEnabled ? '1' : '0'); } catch { /* storage blocked */ }
+});
 
 const state = {
   mode: 'title',         // 'title' | 'play' | 'over'
@@ -43,6 +54,7 @@ const state = {
   aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
   walking: false,        // joystick/keys held this frame (the camera waits until you stop)
+  hop: null,             // edge hop being lined up: { tile, x, y, t } (x, y = predicted landing spot)
   view: { w: 0, h: 0, dpr: 1 },
 };
 window.game = state; // handy for poking at from the dev console
@@ -78,6 +90,7 @@ function newGame() {
   state.pickups = [];
   state.popups = [];
   state.pulses = [];
+  state.hop = null;
   input.slider = null;
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
@@ -122,6 +135,13 @@ function walk(v, dt) {
   const p = state.player;
   const dir = worldDir(v);
   const step = C.WALK_SPEED * v.mag * dt;
+  // Close to the edge and pushing towards it? Line up an edge hop. (Probing a
+  // little ahead keeps this steady while you slide along the edge.)
+  if (!W.containsPoint(p.tile, p.x + dir.x * C.HOP_PROBE, p.y + dir.y * C.HOP_PROBE)) {
+    if (lineUpHop(dir, v, dt)) return;
+  } else {
+    state.hop = null;
+  }
   for (const a of [0, 0.6, -0.6, 1.2, -1.2]) {
     const d = G.rotate(dir.x, dir.y, a);
     const s = step * Math.cos(a);
@@ -133,8 +153,63 @@ function walk(v, dt) {
       if (rest && Math.hypot(p.lx - rest.x, p.ly - rest.y) > C.WAKE_DISTANCE) W.startCrack(p.tile, p.lx, p.ly);
       return;
     }
-    if (a === 0 && stepAcross(nx, ny, d)) return;
+    if (a === 0 && stepAcross(nx, ny, d)) {
+      state.hop = null;
+      return;
+    }
   }
+}
+
+// Where a tile will be after `secs` (drift only; ignores knocks and collisions).
+function predict(tile, secs) {
+  const q = { x: tile.x, y: tile.y };
+  const steps = 6;
+  for (let i = 0; i < steps; i++) W.driftPoint(q, tile.area, secs / steps);
+  return { x: q.x, y: q.y, angle: tile.angle + tile.spin * secs };
+}
+
+// Best tile to hop to when pushing into the edge in world direction `dir`.
+// Aims a little inside the tile from its predicted centre, towards the player.
+function findHopTarget(dir) {
+  const p = state.player;
+  let best = null, bestScore = Infinity;
+  for (const t of state.tiles) {
+    if (t === p.tile || t.rubble) continue;
+    if (Math.hypot(t.x - p.x, t.y - p.y) > C.HOP_RANGE + t.radius + 60) continue;
+    const f = predict(t, C.HOP_AIR_TIME);
+    const cx = f.x - p.x, cy = f.y - p.y, dc = Math.hypot(cx, cy) || 1;
+    const pull = Math.min(t.radius * 0.4, dc * 0.5);
+    let x = f.x - (cx / dc) * pull, y = f.y - (cy / dc) * pull;
+    const l = G.rotate(x - f.x, y - f.y, -f.angle);
+    if (!G.pointInPolygon(l.x, l.y, t.poly)) { x = f.x; y = f.y; }
+    const dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
+    if (d > C.HOP_RANGE) continue;
+    const off = Math.acos(G.clamp((dx * dir.x + dy * dir.y) / (d || 1), -1, 1));
+    if (off > C.HOP_CONE) continue;
+    const score = d * (1 + off * 1.5);
+    if (score < bestScore) { bestScore = score; best = { tile: t, x, y }; }
+  }
+  return best;
+}
+
+// Pushing firmly into the edge towards a reachable tile lines up a hop;
+// holding it for HOP_DELAY fires it. Returns true if the player hopped.
+function lineUpHop(dir, v, dt) {
+  if (v.mag < C.HOP_MIN_PUSH) { state.hop = null; return false; }
+  const target = findHopTarget(dir);
+  if (!target) { state.hop = null; return false; }
+  const h = state.hop && state.hop.tile === target.tile ? state.hop : { t: 0 };
+  state.hop = { ...target, t: h.t + dt };
+  if (state.hop.t < C.HOP_DELAY) return false;
+  const p = state.player;
+  const hopTarget = target;
+  state.hop = null;
+  const dx = hopTarget.x - p.x, dy = hopTarget.y - p.y;
+  state.face = { x: dx / (Math.hypot(dx, dy) || 1), y: dy / (Math.hypot(dx, dy) || 1) };
+  p.mode = 'air';
+  p.tile = null;
+  p.jump = { sx: p.x, sy: p.y, tx: hopTarget.x, ty: hopTarget.y, t: 0, dur: C.HOP_AIR_TIME, target: hopTarget.tile };
+  return true;
 }
 
 function stepAcross(nx, ny, d) {
@@ -163,7 +238,7 @@ function jump(power) {
   const d = jumpDistance(power), f = state.face;
   p.mode = 'air';
   p.tile = null;
-  p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0 };
+  p.jump = { sx: p.x, sy: p.y, tx: p.x + f.x * d, ty: p.y + f.y * d, t: 0, dur: C.AIR_TIME, target: null };
 }
 
 function land() {
@@ -173,6 +248,7 @@ function land() {
   for (const t of state.tiles) {
     if (!t.rubble && W.containsPoint(t, p.x, p.y) && (!best || t.area < best.area)) best = t;
   }
+  if (!best) best = forgiveLanding(p);
   if (!best) return fall();
   const l = W.toLocal(best, p.x, p.y);
   p.mode = 'tile';
@@ -185,6 +261,23 @@ function land() {
 
 // Falling costs FALL_PENALTY vortex strength; you respawn where you fell.
 // `consumed` is the vortex reaching STRENGTH_MAX: no penalty, the run just ends.
+// A hop aimed at a tile that got knocked slightly aside still lands on it:
+// if the target is close, slide the landing point towards its centre.
+function forgiveLanding(p) {
+  const t = p.jump && p.jump.target;
+  if (!t || t.rubble || !state.tiles.includes(t)) return null;
+  if (Math.hypot(p.x - t.x, p.y - t.y) > t.radius + 25) return null;
+  for (let i = 1; i <= 6; i++) {
+    const x = G.lerp(p.x, t.x, i / 6), y = G.lerp(p.y, t.y, i / 6);
+    if (W.containsPoint(t, x, y)) {
+      p.x = x;
+      p.y = y;
+      return t;
+    }
+  }
+  return null;
+}
+
 function fall(consumed = false) {
   const p = state.player;
   p.mode = 'falling';
@@ -291,6 +384,7 @@ function updatePlayer(dt) {
   const p = state.player;
   const move = state.mode === 'play' ? moveVector() : null;
   state.walking = !!move;
+  if (!move || p.mode !== 'tile') state.hop = null;
   if (move) state.face = worldDir(move); // facing is kept in world space
   if (p.mode === 'tile') {
     const w = W.toWorld(p.tile, p.lx, p.ly);
@@ -300,7 +394,7 @@ function updatePlayer(dt) {
   } else if (p.mode === 'air') {
     const j = p.jump;
     j.t += dt;
-    const k = Math.min(1, j.t / C.AIR_TIME);
+    const k = Math.min(1, j.t / j.dur);
     p.x = G.lerp(j.sx, j.tx, k);
     p.y = G.lerp(j.sy, j.ty, k);
     if (k >= 1) land();

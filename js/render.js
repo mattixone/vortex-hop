@@ -210,6 +210,35 @@ function drawPickupArrows(ctx, state) {
   }
 }
 
+// Edge hop: outline the tile you're about to hop to and fill a ring at the landing spot.
+function drawHopTarget(ctx, state, px) {
+  const h = state.hop;
+  if (!h) return;
+  const t = h.tile, k = G.clamp(h.t / C.HOP_DELAY, 0, 1);
+  ctx.save();
+  ctx.translate(t.x, t.y);
+  ctx.rotate(t.angle);
+  tracePoly(ctx, t.poly);
+  ctx.lineWidth = (2 + k * 2) * px;
+  ctx.strokeStyle = `rgba(255,255,255,${0.35 + k * 0.6})`;
+  ctx.stroke();
+  ctx.restore();
+  const p = state.player;
+  ctx.setLineDash([5 * px, 6 * px]);
+  ctx.lineWidth = 1.5 * px;
+  ctx.strokeStyle = `rgba(255,255,255,${0.3 + k * 0.4})`;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(h.x, h.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 3 * px;
+  ctx.strokeStyle = '#5affaa';
+  ctx.beginPath();
+  ctx.arc(h.x, h.y, 10 * px, -Math.PI / 2, -Math.PI / 2 + k * G.TAU);
+  ctx.stroke();
+}
+
 function drawCore(ctx) {
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, C.CORE_R * 3);
   g.addColorStop(0, 'rgba(0,0,0,1)');
@@ -225,7 +254,7 @@ function drawCore(ctx) {
 function drawPlayer(ctx, state, px) {
   const p = state.player;
   let r = C.PLAYER_R, alpha = 1, lift = 0;
-  if (p.mode === 'air') lift = Math.sin(Math.PI * Math.min(1, p.jump.t / C.AIR_TIME));
+  if (p.mode === 'air') lift = Math.sin(Math.PI * Math.min(1, p.jump.t / p.jump.dur));
   if (p.mode === 'falling') {
     const k = p.fallT / C.FALL_TIME;
     r *= 1 - k;
@@ -426,7 +455,7 @@ function drawControls(ctx, state) {
   ctx.arc(knob.x, knob.y, L.joyR * 0.42, 0, G.TAU);
   ctx.fill();
 
-  drawSlider(ctx, L.slider);
+  if (input.sliderEnabled) drawSlider(ctx, L.slider);
 }
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -531,6 +560,7 @@ export function render(canvas, state) {
     ctx.fillRect(q.x - 2 * px, q.y - 2 * px, 4 * px, 4 * px);
   }
   drawPickups(ctx, state, px);
+  drawHopTarget(ctx, state, px);
   drawCore(ctx);
   drawPlayer(ctx, state, px);
   ctx.restore();

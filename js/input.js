@@ -3,6 +3,7 @@ import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 
 export const input = {
+  sliderEnabled: false,    // optional two-handed jump slider (a setting)
   joy: null,               // { id, ox, oy, x, y } while a finger is on the joystick
   // Jump slider while held: { id, startY, x, restY, s }. s is 0 at rest (short hop),
   // 1 at the top (longest jump) and negative when pulled down towards cancel.
@@ -81,7 +82,7 @@ export function initInput(canvas, handlers) {
     if (!handlers.active()) return;
     e.preventDefault();
     const x = e.clientX, y = e.clientY;
-    if (x > window.innerWidth / 2) {
+    if (input.sliderEnabled && x > window.innerWidth / 2) {
       // The slider appears under your thumb anywhere on the right half.
       if (input.slider) return;
       const L = layout.slider;
