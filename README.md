@@ -16,6 +16,8 @@ No build step and no dependencies: just `index.html` and the files in `js/`.
 
 **Game controller** (Xbox, PlayStation, Switch Pro and most others, including on iPhone/iPad): left stick walks, right stick aims a jump (tilt = direction and distance, centre = cancel), A / RB / RT jumps, Start pauses (then Start resumes, Y restarts). A or Start plays from the title screen. Rumble on landings, pickups, falls and hits where the browser supports it.
 
+If the sticks or buttons come out scrambled (some Windows/XInput setups report a non-standard layout), open **Set up controller** on the title screen: it walks you through pushing each stick and pressing your jump and pause buttons, saves the mapping for that controller, and shows live stick/button readings.
+
 Directions are relative to the screen. When you stop walking, the view swings round so you're facing up the screen, and a small gold arrow next to you always points to the rim. The camera zooms in when you're on smaller tiles. Walking off your tile's edge steps you onto any tile that overlaps it (or nearly touches it); otherwise you slide along the edge.
 
 ## Run it locally

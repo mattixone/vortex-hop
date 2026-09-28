@@ -5,7 +5,7 @@ import * as W from './world.js';
 import { render, formatTime } from './render.js';
 import { collide } from './physics.js';
 import { updatePickups, rehome } from './pickups.js';
-import { pad, pollGamepad, justPressed, rumble, BUTTON } from './gamepad.js';
+import { pad, pollGamepad, justPressed, rumble, BUTTON, setup, startSetup, cancelSetup, setupPrompt, padReadout, resetMapping } from './gamepad.js';
 import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill, aimVector } from './input.js';
 
 const canvas = document.getElementById('game');
@@ -412,6 +412,8 @@ let last = performance.now();
 // Start to pause, and from the pause screen Start resumes and Y restarts.
 function handlePad() {
   pollGamepad();
+  updatePadPanel();
+  if (setup.active) return;
   if (pad.active) input.usingPad = true;
   if (state.mode !== 'play') {
     if (justPressed(BUTTON.A, BUTTON.START)) newGame();
@@ -485,10 +487,24 @@ canvas.addEventListener('pointerdown', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.mode === 'play' && !state.paused) togglePause();
 });
-// Show a controller hint on the title/game-over card.
+// Show a controller hint on the title/game-over card, with a setup panel for
+// controllers whose sticks or buttons come out scrambled.
 const padHint = document.getElementById('pad-hint');
+const padPanel = document.getElementById('pad-panel');
+const padStep = document.getElementById('pad-step');
+const padReadoutEl = document.getElementById('pad-readout');
 window.addEventListener('gamepadconnected', () => { padHint.hidden = false; });
 window.addEventListener('gamepaddisconnected', () => { padHint.hidden = !pollGamepad().connected; });
+document.getElementById('pad-setup-open').addEventListener('click', () => { padPanel.hidden = false; });
+document.getElementById('pad-setup-start').addEventListener('click', startSetup);
+document.getElementById('pad-reset').addEventListener('click', () => { cancelSetup(); resetMapping(); });
+document.getElementById('pad-close').addEventListener('click', () => { cancelSetup(); padPanel.hidden = true; });
+
+function updatePadPanel() {
+  if (padPanel.hidden) return;
+  padStep.textContent = setupPrompt() || 'If the sticks or buttons act strangely, press Start setup.';
+  padReadoutEl.textContent = padReadout();
+}
 window.addEventListener('resize', resize);
 playButton.addEventListener('click', newGame);
 

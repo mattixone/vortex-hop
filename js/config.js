@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 19,                        // shown on the title screen; bump on every deploy
+  BUILD: 20,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in

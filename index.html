@@ -26,6 +26,13 @@
     button:hover { filter: brightness(1.1); }
     .build { font-size: 12px; opacity: 0.5; margin-top: 14px; }
     .pad-hint { font-size: 14px; color: #5affaa; margin-top: 12px; }
+    button.link { background: none; color: #5affaa; text-decoration: underline; padding: 0; margin: 0 0 0 6px;
+      font-size: 14px; font-weight: 600; border-radius: 0; }
+    .pad-panel { margin-top: 12px; padding: 12px; border: 1px solid rgba(90,255,170,0.35); border-radius: 12px; text-align: left; }
+    .pad-step { color: #fff; font-weight: 600; margin: 0 0 8px; }
+    .pad-readout { font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; color: #b8c2e6; margin: 0 0 8px; }
+    .pad-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    button.small { margin: 0; font-size: 13px; padding: 7px 14px; }
     .setting { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 12px;
       font-size: 14px; color: #b8c2e6; }
     .setting input { width: 18px; height: 18px; accent-color: #5affaa; }
@@ -45,7 +52,16 @@
       </ul>
       <label class="setting"><input type="checkbox" id="slider-toggle"> Jump slider (two-handed long jumps)</label>
       <button id="play">Play</button>
-      <p id="pad-hint" class="pad-hint" hidden>Controller connected: press A to play</p>
+      <p id="pad-hint" class="pad-hint" hidden>Controller connected: press A to play <button id="pad-setup-open" class="link">Set up controller</button></p>
+      <div id="pad-panel" class="pad-panel" hidden>
+        <p id="pad-step" class="pad-step"></p>
+        <pre id="pad-readout" class="pad-readout"></pre>
+        <div class="pad-buttons">
+          <button id="pad-setup-start" class="small">Start setup</button>
+          <button id="pad-reset" class="small">Reset to default</button>
+          <button id="pad-close" class="small">Close</button>
+        </div>
+      </div>
       <p id="build" class="build"></p>
     </div>
   </div>
