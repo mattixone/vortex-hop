@@ -8,10 +8,12 @@ function tileFromPoly(x, y, poly, angle) {
   const area = G.polygonArea(poly);
   let radius = 0;
   for (const p of poly) radius = Math.max(radius, Math.hypot(p.x, p.y));
+  const spin = (Math.random() - 0.5) * 0.3;
   return {
     id: nextId++,
     x, y, angle, poly, area, radius,
-    spin: (Math.random() - 0.5) * 0.3,
+    spin,
+    baseSpin: spin,            // collisions change spin; it settles back to this
     kx: 0, ky: 0,              // shatter kick velocity, decays over time
     crack: null,               // set when someone lands on the tile
     rubble: area < C.MIN_AREA, // too small to stand on; drifts until swallowed
@@ -52,6 +54,8 @@ export function updateTile(t, dt) {
   const damp = Math.exp(-C.KICK_DAMPING * dt);
   t.kx *= damp;
   t.ky *= damp;
+  t.spin += (t.baseSpin - t.spin) * (1 - Math.exp(-C.SPIN_DAMPING * dt));
+  t.spin = G.clamp(t.spin, -C.MAX_SPIN, C.MAX_SPIN);
   t.angle += t.spin * dt;
   if (t.crack) t.crack.t += dt;
 }
@@ -140,7 +144,7 @@ export function shatter(t) {
     const strength = C.SHATTER_KICK * (0.6 + Math.random() * 0.8);
     f.kx = t.kx + kick.x * strength;
     f.ky = t.ky + kick.y * strength;
-    f.spin = t.spin + (Math.random() - 0.5) * 0.8;
+    f.spin = f.baseSpin = t.spin + (Math.random() - 0.5) * 0.8;
     f.srcCell = cell;
     f.srcCenter = c;
     frags.push(f);

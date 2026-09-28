@@ -3,6 +3,7 @@ import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import * as W from './world.js';
 import { render } from './render.js';
+import { collide } from './physics.js';
 import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill } from './input.js';
 
 const canvas = document.getElementById('game');
@@ -251,6 +252,12 @@ function updateTiles(dt) {
     next.push(t);
   }
   state.tiles = next;
+
+  for (const hit of collide(state.tiles)) {
+    const k = Math.min(1, hit.speed / 200);
+    burst(hit.x, hit.y, 3 + Math.round(k * 8), 'rgba(200,220,255,', 40 + k * 80);
+    if (hit.a === p.tile || hit.b === p.tile) state.cam.shake = Math.max(state.cam.shake, 2 + k * 8);
+  }
   W.feedRim(state.tiles);
 }
 

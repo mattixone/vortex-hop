@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 9,                         // shown on the title screen; bump on every deploy
+  BUILD: 10,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // reach this radius to win
@@ -39,7 +39,16 @@ export const CONFIG = {
   SHARDS_MAX: 14,
   CLEAN_SPLIT_MAX: 3,               // tiles breaking into this few pieces split evenly instead of shattering
   SHATTER_KICK: 45,                 // px/s push away from the impact point
-  KICK_DAMPING: 1.5,
+  KICK_DAMPING: 1.5,                // how fast knocks (from shatters and collisions) fade back into the current
+
+  // Collisions between tiles
+  COLLIDE_BOUNCE: 0.25,             // 0 = thud, 1 = perfectly bouncy
+  COLLIDE_PUSH: 0.6,                // fraction of any overlap pushed apart each frame
+  COLLIDE_SLOP: 0.5,                // px of overlap allowed before pushing (stops jitter)
+  CORE_NO_COLLIDE: 210,             // inside this radius tiles stop colliding so they can fall in
+  SPIN_DAMPING: 0.6,                // how fast collision spin settles back to the tile's natural spin
+  MAX_SPIN: 3,                      // rad/s cap
+  IMPACT_SPEED: 45,                 // closing speed (px/s) that throws sparks
 
   // Player
   WALK_SPEED: 110,                  // px/s across a tile at full joystick
