@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 16,                        // shown on the title screen; bump on every deploy
+  BUILD: 17,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -74,15 +74,18 @@ export const CONFIG = {
   STEP_REACH: 14,                   // can step over gaps this wide onto a neighbouring tile
   JUMP_MIN: 70,                     // jump slider at rest (a quick tap)
   JUMP_RANGE: 260,                  // jump slider pushed to the top
-  CHARGE_TIME: 0.8,                 // seconds of charging (edge charge, or holding Space) to reach JUMP_RANGE
+  CHARGE_TIME: 0.8,                 // keyboard: seconds holding Space to reach JUMP_RANGE
   AIR_TIME: 0.45,                   // seconds in the air; tiles keep moving meanwhile
 
-  // Edge charge (one-handed jumping): push firmly into your tile's edge where
-  // there's a gap and a landing marker slides out from JUMP_MIN to JUMP_RANGE over
-  // CHARGE_TIME. Let go to jump there; slide back to the centre to cancel.
-  EDGE_PUSH: 0.6,                   // joystick must be pushed at least this far (0..1) to start charging
-  EDGE_PROBE: 16,                   // px ahead of the player that must be off the tile to count as the edge
-  CHARGE_MIN_HOLD: 0.2,             // letting go sooner than this cancels (so stopping at an edge is safe)
+  // Double-tap-and-drag jump (one-handed): tap, then tap again and hold, and drag
+  // the way you want to jump. Drag distance sets jump distance; let go to jump.
+  // Letting go inside AIM_DEADZONE cancels.
+  TAP_MAX_TIME: 0.25,               // a touch shorter than this (s)...
+  TAP_MAX_MOVE: 12,                 // ...that moves less than this (px) counts as a tap
+  DOUBLE_TAP_TIME: 0.35,            // second touch must start within this long (s) after the tap
+  DOUBLE_TAP_DIST: 70,              // ...and this close (px) to it
+  AIM_DEADZONE: 20,                 // px of drag that does nothing (let go here to cancel)
+  AIM_DRAG: 110,                    // px of drag for a full-length jump
   PLAYER_R: 10,
   FALL_TIME: 1.2,
 

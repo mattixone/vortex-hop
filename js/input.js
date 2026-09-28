@@ -1,10 +1,11 @@
-// On-screen joystick + jump slider (touch or mouse) and keyboard controls.
+// On-screen joystick, double-tap-and-drag jump, optional jump slider, keyboard.
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 
 export const input = {
   sliderEnabled: false,    // optional two-handed jump slider (a setting)
-  joy: null,               // { id, ox, oy, x, y } while a finger is on the joystick
+  joy: null,               // { id, ox, oy, x, y, t0 } while a finger is on the joystick
+  aim: null,               // double-tap-and-drag jump being aimed: { id, ox, oy, x, y }
   // Jump slider while held: { id, startY, x, restY, s }. s is 0 at rest (short hop),
   // 1 at the top (longest jump) and negative when pulled down towards cancel.
   slider: null,
@@ -76,7 +77,19 @@ export function keyboardFill(dt) {
   if (sl && sl.id === 'key') sl.s = Math.min(1, sl.s + dt / C.CHARGE_TIME);
 }
 
-// handlers: { active(), jump(power 0..1), restart() }
+let lastTap = null; // { t, x, y } of the last quick tap, for spotting a double tap
+
+// The jump being aimed, in screen space: direction and power (0..1), or null when
+// the thumb is inside the dead zone (letting go there cancels).
+export function aimVector() {
+  const a = input.aim;
+  if (!a) return null;
+  const dx = a.x - a.ox, dy = a.y - a.oy, d = Math.hypot(dx, dy);
+  if (d < C.AIM_DEADZONE) return null;
+  return { x: dx / d, y: dy / d, power: G.clamp((d - C.AIM_DEADZONE) / (C.AIM_DRAG - C.AIM_DEADZONE), 0, 1) };
+}
+
+// handlers: { active(), jump(power 0..1, screenDir?), restart() }
 export function initInput(canvas, handlers) {
   canvas.addEventListener('pointerdown', (e) => {
     if (!handlers.active()) return;
@@ -94,13 +107,26 @@ export function initInput(canvas, handlers) {
         s: 0,
       };
     } else {
-      if (input.joy) return;
-      input.joy = { id: e.pointerId, ox: x, oy: y, x, y };
+      if (input.joy || input.aim) return;
+      const now = performance.now() / 1000;
+      if (lastTap && now - lastTap.t < C.DOUBLE_TAP_TIME && Math.hypot(x - lastTap.x, y - lastTap.y) < C.DOUBLE_TAP_DIST) {
+        // Second tap of a double tap, held: aim a jump instead of walking.
+        input.aim = { id: e.pointerId, ox: x, oy: y, x, y };
+        lastTap = null;
+      } else {
+        input.joy = { id: e.pointerId, ox: x, oy: y, x, y, t0: now };
+      }
     }
     try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    const a = input.aim;
+    if (a && e.pointerId === a.id) {
+      a.x = e.clientX;
+      a.y = e.clientY;
+      return;
+    }
     const sl = input.slider;
     if (sl && e.pointerId === sl.id) {
       const L = layout.slider;
@@ -120,7 +146,20 @@ export function initInput(canvas, handlers) {
   });
 
   const end = (release) => (e) => {
-    if (input.joy && e.pointerId === input.joy.id) input.joy = null;
+    const j = input.joy;
+    if (j && e.pointerId === j.id) {
+      // A quick touch that barely moved is a tap (the first half of a double tap).
+      const now = performance.now() / 1000;
+      const moved = Math.hypot(e.clientX - j.ox, e.clientY - j.oy);
+      lastTap = release && now - j.t0 < C.TAP_MAX_TIME && moved < C.TAP_MAX_MOVE ? { t: now, x: j.ox, y: j.oy } : null;
+      input.joy = null;
+    }
+    const a = input.aim;
+    if (a && e.pointerId === a.id) {
+      const v = release ? aimVector() : null;
+      input.aim = null;
+      if (v) handlers.jump(v.power, v);
+    }
     if (input.slider && e.pointerId === input.slider.id) {
       release ? releaseSlider(handlers) : (input.slider = null);
     }
@@ -158,6 +197,7 @@ export function initInput(canvas, handlers) {
   window.addEventListener('blur', () => {
     input.keys.clear();
     input.joy = null;
+    input.aim = null;
     input.slider = null;
   });
 }

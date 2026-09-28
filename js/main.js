@@ -5,7 +5,7 @@ import * as W from './world.js';
 import { render, formatTime } from './render.js';
 import { collide } from './physics.js';
 import { updatePickups, rehome } from './pickups.js';
-import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill } from './input.js';
+import { input, initInput, moveVector, updateLayout, sliderCancelled, keyboardFill, aimVector } from './input.js';
 
 const canvas = document.getElementById('game');
 const overlay = document.getElementById('overlay');
@@ -27,7 +27,7 @@ function saveBest(t) {
   try { localStorage.setItem(BEST_KEY, String(t)); } catch { /* private mode etc. */ }
 }
 
-// Optional two-handed jump slider (off by default; the edge charge always works).
+// Optional two-handed jump slider (off by default; double-tap-and-drag always works).
 const sliderToggle = document.getElementById('slider-toggle');
 try { input.sliderEnabled = localStorage.getItem(SLIDER_KEY) === '1'; } catch { /* storage blocked */ }
 sliderToggle.checked = input.sliderEnabled;
@@ -54,7 +54,6 @@ const state = {
   aim: null,             // where a jump released now would land (while the slider is held)
   face: { x: 0, y: -1 }, // facing direction in world space
   walking: false,        // joystick/keys held this frame (the camera waits until you stop)
-  charge: null,          // edge charge in progress: { t, dir } (dir in world space)
   aimOnTile: false,      // is there a tile under the landing marker right now?
   view: { w: 0, h: 0, dpr: 1 },
 };
@@ -91,8 +90,8 @@ function newGame() {
   state.pickups = [];
   state.popups = [];
   state.pulses = [];
-  state.charge = null;
   input.slider = null;
+  input.aim = null;
   state.cam.x = state.player.x;
   state.cam.y = state.player.y;
   state.cam.angle = -Math.PI / 2 - Math.atan2(state.face.y, state.face.x);
@@ -136,14 +135,6 @@ function walk(v, dt) {
   const p = state.player;
   const dir = worldDir(v);
   const step = C.WALK_SPEED * v.mag * dt;
-  // Pushing firmly into the edge where there's a gap starts an edge charge (feet
-  // planted from then on). If a tile is right there instead, walking steps across.
-  const ax = p.x + dir.x * C.EDGE_PROBE, ay = p.y + dir.y * C.EDGE_PROBE;
-  const bx = ax + dir.x * C.STEP_REACH, by = ay + dir.y * C.STEP_REACH;
-  if (v.mag >= C.EDGE_PUSH && !W.containsPoint(p.tile, ax, ay) && !tileAt(ax, ay, p.tile) && !tileAt(bx, by, p.tile)) {
-    state.charge = { t: 0, dir };
-    return;
-  }
   for (const a of [0, 0.6, -0.6, 1.2, -1.2]) {
     const d = G.rotate(dir.x, dir.y, a);
     const s = step * Math.cos(a);
@@ -165,20 +156,6 @@ function tileAt(x, y, except = null) {
   return null;
 }
 
-// Distance of an edge-charge jump after charging for `t` seconds.
-function chargeDistance(t) {
-  return jumpDistance(G.clamp((t - C.CHARGE_MIN_HOLD) / C.CHARGE_TIME, 0, 1));
-}
-
-// Thumb lifted (or keys released) while charging: jump, unless it was just a quick stop.
-function releaseCharge() {
-  const c = state.charge;
-  state.charge = null;
-  if (c.t < C.CHARGE_MIN_HOLD) return;
-  state.face = c.dir;
-  jump(G.clamp((c.t - C.CHARGE_MIN_HOLD) / C.CHARGE_TIME, 0, 1));
-}
-
 function stepAcross(nx, ny, d) {
   const p = state.player;
   const rx = nx + d.x * C.STEP_REACH, ry = ny + d.y * C.STEP_REACH;
@@ -198,10 +175,12 @@ function jumpDistance(power) {
   return G.lerp(C.JUMP_MIN, C.JUMP_RANGE, power);
 }
 
-// You can set the slider mid-air; the jump only happens if you release on a tile.
-function jump(power) {
+// You can aim mid-air; the jump only happens if you release on a tile.
+// `screenDir` (from the double-tap-and-drag aim) overrides the facing direction.
+function jump(power, screenDir = null) {
   const p = state.player;
   if (p.mode !== 'tile') return;
+  if (screenDir) state.face = worldDir(screenDir);
   const d = jumpDistance(power), f = state.face;
   p.mode = 'air';
   p.tile = null;
@@ -234,7 +213,6 @@ function fall(consumed = false) {
   p.fallT = 0;
   p.fellAt = { x: p.x, y: p.y };
   input.slider = null;
-  state.charge = null;
   if (state.mode !== 'play') return;
   if (consumed) {
     say('The vortex consumed you');
@@ -333,25 +311,16 @@ function updateScore(dt) {
 function updatePlayer(dt) {
   const p = state.player;
   const move = state.mode === 'play' ? moveVector() : null;
-  state.walking = !!move;
-  if (state.charge && (p.mode !== 'tile' || state.mode !== 'play')) state.charge = null;
-  if (state.charge) {
-    if (move) {
-      state.charge.t += dt;
-      state.charge.dir = worldDir(move); // aim follows your thumb
-    } else if (input.joy) {
-      state.charge = null; // thumb slid back to the centre: cancel
-    } else {
-      releaseCharge(); // thumb lifted (or keys released): jump
-    }
-  }
-  if (state.charge) state.face = state.charge.dir;
+  const aimDir = state.mode === 'play' ? aimVector() : null;
+  // Aiming holds the camera still too, so the drag direction stays put on screen.
+  state.walking = !!move || !!input.aim;
+  if (aimDir) state.face = worldDir(aimDir);
   else if (move) state.face = worldDir(move); // facing is kept in world space
   if (p.mode === 'tile') {
     const w = W.toWorld(p.tile, p.lx, p.ly);
     p.x = w.x;
     p.y = w.y;
-    if (move && !state.charge) walk(move, dt);
+    if (move) walk(move, dt);
   } else if (p.mode === 'air') {
     const j = p.jump;
     j.t += dt;
@@ -369,9 +338,9 @@ function updatePlayer(dt) {
 
   keyboardFill(dt);
   const sl = input.slider;
-  if (state.charge && p.mode === 'tile') {
-    const d = chargeDistance(state.charge.t);
-    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d, armed: state.charge.t >= C.CHARGE_MIN_HOLD };
+  if (aimDir && p.mode === 'tile') {
+    const d = jumpDistance(aimDir.power);
+    state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d, armed: true };
   } else if (sl && !sliderCancelled(sl) && p.mode === 'tile') {
     const d = jumpDistance(G.clamp(sl.s, 0, 1));
     state.aim = { x: p.x + state.face.x * d, y: p.y + state.face.y * d, armed: true };

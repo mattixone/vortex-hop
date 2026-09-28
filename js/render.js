@@ -234,7 +234,7 @@ function drawPlayer(ctx, state, px) {
   if (r <= 0) return;
 
   if (state.aim) {
-    // Charging (edge charge or slider): faint max-range ring, dashed line and a marker where you'll land.
+    // Aiming a jump (double-tap-and-drag or slider): faint max-range ring, dashed line and a marker where you'll land.
     const a = state.aim;
     ctx.lineWidth = 1.5 * px;
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -409,11 +409,8 @@ function drawHud(ctx, state) {
   }
 }
 
-function drawControls(ctx, state) {
-  const L = getLayout();
-  if (!L || state.mode !== 'play') return;
-
-  // Joystick: sits at its home spot until a thumb lands on the left half.
+// Joystick: sits at its home spot until a thumb lands.
+function drawJoystick(ctx, L) {
   const j = input.joy;
   const base = j ? { x: j.ox, y: j.oy } : L.joyHome;
   const knob = j ? { x: j.x, y: j.y } : L.joyHome;
@@ -428,8 +425,54 @@ function drawControls(ctx, state) {
   ctx.beginPath();
   ctx.arc(knob.x, knob.y, L.joyR * 0.42, 0, G.TAU);
   ctx.fill();
+}
 
+function drawControls(ctx, state) {
+  const L = getLayout();
+  if (!L || state.mode !== 'play') return;
+
+  if (!input.aim) drawJoystick(ctx, L); // hidden while aiming a jump
   if (input.sliderEnabled) drawSlider(ctx, L.slider);
+  drawAimControl(ctx);
+}
+
+// Double-tap-and-drag jump: a ring around where the second tap landed, a red
+// cancel circle in the middle, and a knob under your thumb.
+function drawAimControl(ctx) {
+  const a = input.aim;
+  if (!a) return;
+  const dx = a.x - a.ox, dy = a.y - a.oy, d = Math.hypot(dx, dy);
+  const cancel = d < C.AIM_DEADZONE;
+  const k = Math.min(1, d / C.AIM_DRAG);
+  const kx = a.ox + (d ? (dx / d) * k * C.AIM_DRAG : 0), ky = a.oy + (d ? (dy / d) * k * C.AIM_DRAG : 0);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.beginPath();
+  ctx.arc(a.ox, a.oy, C.AIM_DRAG, 0, G.TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = cancel ? 'rgba(255,90,90,0.5)' : 'rgba(255,90,90,0.18)';
+  ctx.beginPath();
+  ctx.arc(a.ox, a.oy, C.AIM_DEADZONE, 0, G.TAU);
+  ctx.fill();
+  if (!cancel) {
+    ctx.strokeStyle = k >= 1 ? '#fff' : '#5affaa';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(a.ox, a.oy);
+    ctx.lineTo(kx, ky);
+    ctx.stroke();
+  }
+  ctx.fillStyle = cancel ? '#ff6b6b' : k >= 1 ? '#fff' : '#5affaa';
+  ctx.beginPath();
+  ctx.arc(kx, ky, 18, 0, G.TAU);
+  ctx.fill();
+  ctx.fillStyle = '#05201a';
+  ctx.font = '700 11px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(cancel ? '✕' : 'JUMP', kx, ky);
 }
 
 function roundedRect(ctx, x, y, w, h, r) {

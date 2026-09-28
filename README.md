@@ -9,7 +9,7 @@ No build step and no dependencies: just `index.html` and the files in `js/`.
 | | Touch | Keyboard |
 |---|---|---|
 | Walk | Drag anywhere with one thumb (left half only when the jump slider is on) | Arrows or WASD |
-| Jump (edge charge) | Push firmly into your tile's edge where there's a gap: a landing marker slides out (green when a tile is under it). Let go to jump; slide back to the centre to cancel. | Same with the arrow keys: release to jump |
+| Jump (double-tap and drag) | Tap, then tap again and hold, and drag the way you want to jump. Drag distance sets jump distance (the landing marker is green when a tile is under it). Let go to jump; let go in the red centre to cancel. | Hold Space (fills the slider), Esc cancels |
 | Jump slider (optional setting) | Slider appears under your right thumb. Slide up = further, down into the red = cancel, let go = jump. | Hold Space (fills the slider), Esc cancels |
 | Restart | | R |
 
@@ -52,7 +52,7 @@ npx serve .        # or: python3 -m http.server
 - [x] Survival run: the vortex strengthens over time, a fall adds +1× and respawns you, the run ends at 5×, best time saved on the device
 - [x] Pickups on tiles calm the vortex; the deeper they are, the more time they buy
 - [x] Edge-of-screen arrows point to the nearest off-screen pickups
-- [x] One-handed edge charge jump; joystick anywhere; jump slider as an optional setting
+- [x] One-handed double-tap-and-drag jump; joystick anywhere; jump slider as an optional setting
 - [ ] Tuning: map size, starting zone, strength curve, pickup count and values
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
