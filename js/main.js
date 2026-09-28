@@ -49,8 +49,7 @@ window.game = state; // handy for poking at from the dev console
 
 // ---- Setup ----
 
-function spawnSafeTile(r) {
-  const th = Math.random() * G.TAU;
+function spawnSafeTile(r, th = Math.random() * G.TAU) {
   const x = Math.cos(th) * r, y = Math.sin(th) * r;
   const tile = W.createTile(x, y, 115);
   state.tiles = state.tiles.filter(
@@ -184,15 +183,34 @@ function land() {
   burst(p.x, p.y, 8, 'rgba(220,230,255,', 60);
 }
 
-function fall() {
+// Falling costs FALL_PENALTY vortex strength; you respawn where you fell.
+// `consumed` is the vortex reaching STRENGTH_MAX: no penalty, the run just ends.
+function fall(consumed = false) {
   const p = state.player;
   p.mode = 'falling';
   p.tile = null;
   p.fallT = 0;
+  p.fellAt = { x: p.x, y: p.y };
   input.slider = null;
+  if (state.mode !== 'play') return;
+  if (consumed) {
+    say('The vortex consumed you');
+  } else {
+    state.strength += C.FALL_PENALTY;
+    W.setStrength(state.strength);
+    state.cam.shake = 10;
+    say(`Fell! Vortex +${C.FALL_PENALTY}×`);
+  }
 }
 
-// A fall ends the run once the falling animation finishes.
+function respawn() {
+  const at = state.player.fellAt;
+  const r = G.clamp(Math.hypot(at.x, at.y), C.CORE_NO_COLLIDE + 300, C.RIM - 300);
+  putPlayerOn(spawnSafeTile(r, Math.atan2(at.y, at.x)));
+  state.trail.push(null); // break the minimap trail instead of drawing a line across
+}
+
+// The run ends when the vortex reaches STRENGTH_MAX.
 function gameOver() {
   state.mode = 'over';
   const newBest = state.time > state.bestTime;
@@ -200,7 +218,7 @@ function gameOver() {
     state.bestTime = state.time;
     saveBest(state.time);
   }
-  overlayTitle.textContent = newBest ? 'New best!' : 'Lost to the vortex';
+  overlayTitle.textContent = newBest ? 'New best!' : 'The vortex consumed you';
   overlayText.textContent = newBest
     ? `You lasted ${formatTime(state.time)}`
     : `You lasted ${formatTime(state.time)} · best ${formatTime(state.bestTime)}`;
@@ -289,7 +307,9 @@ function updatePlayer(dt) {
   } else if (p.mode === 'falling') {
     p.fallT += dt;
     W.driftPoint(p, C.MIN_AREA, dt * 3); // sucked in fast, like the tiniest shard
-    if (p.fallT >= C.FALL_TIME && state.mode === 'play') gameOver();
+    if (p.fallT >= C.FALL_TIME && state.mode === 'play') {
+      state.strength >= C.STRENGTH_MAX ? gameOver() : respawn();
+    }
   }
 
   keyboardFill(dt);
@@ -358,6 +378,7 @@ function frame(now) {
     state.time += dt;
     state.strength += C.STRENGTH_RATE * dt;
     W.setStrength(state.strength);
+    if (state.strength >= C.STRENGTH_MAX && state.player.mode !== 'falling') fall(true);
     updateTiles(dt);
     updatePlayer(dt);
     updateScore(dt);

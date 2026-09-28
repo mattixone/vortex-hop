@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 13,                        // shown on the title screen; bump on every deploy
+  BUILD: 14,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -12,6 +12,8 @@ export const CONFIG = {
   // swirl and inward pull (1 = normal).
   STRENGTH_START: 1,
   STRENGTH_RATE: 0.01,              // added per second
+  STRENGTH_MAX: 5,                  // the run ends when the vortex reaches this
+  FALL_PENALTY: 1,                  // a fall adds this much strength, then you respawn where you fell
 
   // Pickups: each one takes vortex strength away. The amount grows with depth:
   // CALM_MIN at the rim up to CALM_MAX at the core (curved by CALM_CURVE).

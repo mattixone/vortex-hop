@@ -379,16 +379,20 @@ function drawHud(ctx, state) {
   ctx.fillStyle = 'rgba(220,230,255,0.7)';
   ctx.fillText(state.bestTime > 0 ? `Best ${formatTime(state.bestTime)}` : 'No best yet', 14, 46);
 
-  // Vortex strength meter: blue when calm, red when raging
+  // Vortex strength meter: blue when calm, red when raging. Full = the run ends.
+  // A tick at every whole ×, so you can see how many falls you can afford.
   const bw = Math.min(180, state.view.w * 0.4), bx = 14, by = 72;
-  const k = G.clamp((state.strength - 1) / 2, 0, 1); // full bar at 3x
+  const span = C.STRENGTH_MAX - C.STRENGTH_START;
+  const k = G.clamp((state.strength - C.STRENGTH_START) / span, 0, 1);
   ctx.font = '600 11px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(220,230,255,0.7)';
-  ctx.fillText(`VORTEX ×${state.strength.toFixed(2)}`, bx, by);
+  ctx.fillText(`VORTEX ×${Math.min(state.strength, C.STRENGTH_MAX).toFixed(2)} / ${C.STRENGTH_MAX}`, bx, by);
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(bx, by + 16, bw, 6);
+  ctx.fillRect(bx, by + 16, bw, 8);
   ctx.fillStyle = `hsl(${200 - k * 200},85%,60%)`;
-  ctx.fillRect(bx, by + 16, bw * Math.max(0.02, k), 6);
+  ctx.fillRect(bx, by + 16, bw * Math.max(0.02, k), 8);
+  ctx.fillStyle = 'rgba(5,6,13,0.9)';
+  for (let x = 1; x < span; x++) ctx.fillRect(bx + (bw * x) / span - 1, by + 16, 2, 8);
 
   if (state.message) {
     const m = state.message;
