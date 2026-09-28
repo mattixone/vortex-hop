@@ -178,6 +178,38 @@ function drawPopups(ctx, state) {
   ctx.globalAlpha = 1;
 }
 
+// Arrows at the screen edge pointing to the nearest off-screen pickups.
+function drawPickupArrows(ctx, state) {
+  if (state.mode !== 'play') return;
+  const { w, h } = state.view;
+  const o = viewOrigin(state), p = state.player;
+  const left = 22, right = w - 22, top = 120, bottom = h - 22;
+  const near = [...state.pickups]
+    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))
+    .slice(0, 5);
+  for (const k of near) {
+    const sp = worldToScreen(state, k.x, k.y);
+    if (sp.x > left && sp.x < right && sp.y > top && sp.y < bottom) continue; // on screen
+    const dx = sp.x - o.x, dy = sp.y - o.y;
+    let t = Infinity;
+    if (dx > 0) t = Math.min(t, (right - o.x) / dx);
+    if (dx < 0) t = Math.min(t, (left - o.x) / dx);
+    if (dy > 0) t = Math.min(t, (bottom - o.y) / dy);
+    if (dy < 0) t = Math.min(t, (top - o.y) / dy);
+    const x = o.x + dx * t, y = o.y + dy * t;
+    const len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+    const deep = calmAt(k.x, k.y) / C.CALM_MAX;
+    const size = 7 + deep * 6;
+    ctx.fillStyle = `hsla(${190 + deep * 120},100%,72%,0.9)`;
+    ctx.beginPath();
+    ctx.moveTo(x + ux * size, y + uy * size);
+    ctx.lineTo(x - ux * size * 0.6 - uy * size * 0.7, y - uy * size * 0.6 + ux * size * 0.7);
+    ctx.lineTo(x - ux * size * 0.6 + uy * size * 0.7, y - uy * size * 0.6 - ux * size * 0.7);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
 function drawCore(ctx) {
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, C.CORE_R * 3);
   g.addColorStop(0, 'rgba(0,0,0,1)');
@@ -500,6 +532,7 @@ export function render(canvas, state) {
   ctx.restore();
 
   drawPopups(ctx, state);
+  drawPickupArrows(ctx, state);
   drawMinimap(ctx, state);
   drawHud(ctx, state);
   drawControls(ctx, state);

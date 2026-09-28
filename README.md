@@ -50,6 +50,8 @@ npx serve .        # or: python3 -m http.server
 - [x] Tiles collide and bump each other instead of overlapping
 - [x] Survival run: the vortex strengthens over time, a fall ends the run, best time saved on the device
 - [x] Pickups on tiles calm the vortex; the deeper they are, the more time they buy
+- [x] Edge-of-screen arrows point to the nearest off-screen pickups
+- [ ] Tuning: map size, starting zone, strength curve, pickup count and values
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds
 - [ ] Collectables: long-jump charge, slingshot stones
