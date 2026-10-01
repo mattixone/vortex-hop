@@ -1,6 +1,6 @@
 # Vortex Hop
 
-A small browser game: survive on tiles drifting around a vortex for as long as you can. The vortex keeps getting stronger, every fall makes it 1× stronger, and the run ends when it reaches 5×. Tiles break into Voronoi fragments where you land, and smaller fragments spin faster towards the centre.
+A small browser game with two modes. **Singleplayer:** survive on tiles drifting around a vortex for as long as you can. The vortex keeps getting stronger, every fall makes it 1× stronger, and the run ends when it reaches 5×. **Push battle** (Multiplayer, vs bots for now): pickups give push charges, a push blasts a 30° cone of air that shoves other players off their tiles, everyone has 3 falls, last one standing wins. Tiles break into Voronoi fragments where you land, and smaller fragments spin faster towards the centre.
 
 No build step and no dependencies: just `index.html` and the files in `js/`.
 
@@ -39,6 +39,7 @@ npx serve .        # or: python3 -m http.server
 | `js/pickups.js` | Pickups: spawning on tiles, riding along, collecting, depth-based value. |
 | `js/input.js` | On-screen joystick, double-tap-and-drag jump, jump slider, keyboard. |
 | `js/gamepad.js` | Game controller support (Gamepad API). |
+| `js/bots.js` | Computer opponents for the push battle. |
 | `js/main.js` | Game state, walking, jumping, main loop. |
 | `js/render.js` | Drawing: vortex, tiles, player, minimap, HUD, controls. |
 
@@ -60,6 +61,8 @@ npx serve .        # or: python3 -m http.server
 - [x] Edge-of-screen arrows point to the nearest off-screen pickups
 - [x] One-handed double-tap-and-drag jump; joystick anywhere; jump slider as an optional setting
 - [x] Game controller support and pause (auto-pauses when you switch apps)
+- [x] Title menu (Singleplayer, Multiplayer, Settings, Huh?) and the offline push battle vs 1-3 bots
+- [ ] Online push battle with room codes (Cloudflare Durable Objects); see the multiplayer design doc
 - [ ] Tuning: map size, starting zone, strength curve, pickup count and values
 - [x] Size-based fracturing: small tiles split in 2–3, every crack takes 3.5s, the piece you're left on waits until you move, tiny gem tiles never break
 - [ ] Asteroids: steady orbit, clear a gap around them, fling you off after a few seconds

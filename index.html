@@ -26,7 +26,20 @@
     button:hover { filter: brightness(1.1); }
     .build { font-size: 12px; opacity: 0.5; margin-top: 14px; }
     .pad-hint { font-size: 14px; color: #5affaa; margin-top: 12px; }
-    .card-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .menu { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; }
+    .menu button { margin: 0; width: 240px; }
+    .panel { text-align: left; width: 100%; }
+    .panel h2 { margin: 0 0 12px; font-size: 26px; text-align: center; }
+    .panel h3 { margin: 16px 0 4px; font-size: 16px; color: #fff; }
+    .panel > button { display: block; margin: 18px auto 0; }
+    .mode-box { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(90,255,170,0.35); border-radius: 12px; }
+    .mode-box h3 { margin-top: 0; }
+    .mode-box.off { opacity: 0.5; }
+    .mode-box > button { margin-top: 10px; }
+    .bots-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #b8c2e6; }
+    button.chip { margin: 0; padding: 6px 16px; font-size: 15px; background: transparent; color: #5affaa;
+      box-shadow: inset 0 0 0 2px rgba(90,255,170,0.5); }
+    button.chip.on { background: #5affaa; color: #05201a; }
     button.secondary { background: transparent; color: #5affaa; box-shadow: inset 0 0 0 2px #5affaa; }
     .settings { text-align: left; width: 100%; }
     .settings h2 { margin: 0 0 12px; font-size: 26px; text-align: center; }
@@ -48,20 +61,62 @@
   <canvas id="game"></canvas>
   <div id="overlay">
     <div id="main-card" class="card">
-      <h1 id="overlay-title">Vortex Hop</h1>
-      <p id="overlay-text">Survive as long as you can. The vortex keeps getting stronger, and each fall adds 1×; at 5× the run ends. Grab glowing orbs to calm it: the deeper they are, the more they're worth.</p>
-      <ul id="overlay-help">
-        <li><b>One thumb:</b> drag anywhere to walk. To jump, <b>double-tap and hold</b>, then drag the way you want to go: short, medium or long (S, M, L). Let go to jump, or let go in the red centre to cancel.</li>
+      <h1>Vortex Hop</h1>
+      <p>Hop the tiles. Survive the vortex.</p>
+      <div class="menu">
+        <button id="menu-single">Singleplayer</button>
+        <button id="menu-multi">Multiplayer</button>
+        <button id="menu-settings" class="secondary">Settings</button>
+        <button id="menu-help" class="secondary">Huh?</button>
+      </div>
+      <p id="pad-hint" class="pad-hint" hidden>Controller connected: A plays Singleplayer</p>
+      <p id="build" class="build"></p>
+    </div>
+    <div id="multi-card" class="card panel" hidden>
+      <h2>Multiplayer</h2>
+      <div class="mode-box">
+        <h3>Push battle vs bots</h3>
+        <p>Knock the bots off their tiles. Pickups give push charges, everyone has 3 falls, and the last one standing wins.</p>
+        <div class="bots-row">Bots:
+          <button class="chip" data-bots="1">1</button>
+          <button class="chip" data-bots="2">2</button>
+          <button class="chip" data-bots="3">3</button>
+        </div>
+        <button id="battle-start">Start battle</button>
+      </div>
+      <div class="mode-box off">
+        <h3>Online with a room code</h3>
+        <p>Play friends with a room code. Coming soon.</p>
+      </div>
+      <button id="multi-back" class="secondary">Back</button>
+    </div>
+    <div id="help-card" class="card panel" hidden>
+      <h2>Huh?</h2>
+      <h3>Singleplayer</h3>
+      <p>Survive as long as you can. The vortex keeps getting stronger, and each fall adds 1×; at 5× the run ends. Glowing orbs calm it: the deeper they are, the more time they buy.</p>
+      <h3>Push battle</h3>
+      <p>Orbs give push charges (up to 3). A push blasts a narrow cone of air in front of you and shoves anyone in it, harder up close. Everyone has 3 falls; the last one standing wins. You can't be pushed in the air or just after respawning.</p>
+      <h3>Tiles</h3>
+      <ul>
         <li>Tiles crack when you land and break 3.5s later, along the cracks shown. After a break, your piece waits until you move.</li>
         <li>Small tiles are faster (orange). Tiny <b>gem</b> tiles never break.</li>
-        <li>Controller: left stick walks, right stick aims, A jumps.</li>
       </ul>
-      <div class="card-buttons">
-        <button id="play">Play</button>
-        <button id="settings-open" class="secondary">Settings</button>
+      <h3>Controls</h3>
+      <ul>
+        <li><b>Touch:</b> drag anywhere to walk. To jump, double-tap and hold, then drag the way you want to go: short, medium or long. Let go in the red centre to cancel. In a battle, tap PUSH.</li>
+        <li><b>Controller:</b> left stick walks, right stick aims, A jumps, X or LB pushes, Start pauses.</li>
+        <li><b>Keyboard:</b> arrows or WASD walk, hold Space to jump, F pushes, P pauses, R restarts.</li>
+      </ul>
+      <button id="help-back">Back</button>
+    </div>
+    <div id="over-card" class="card" hidden>
+      <h1 id="over-title"></h1>
+      <p id="over-text"></p>
+      <div class="menu">
+        <button id="over-again">Play again</button>
+        <button id="over-menu" class="secondary">Menu</button>
+        <button id="over-settings" class="secondary">Settings</button>
       </div>
-      <p id="pad-hint" class="pad-hint" hidden>Controller connected: press A to play</p>
-      <p id="build" class="build"></p>
     </div>
     <div id="settings" class="card settings" hidden>
       <h2>Settings</h2>

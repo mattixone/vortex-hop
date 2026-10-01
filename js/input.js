@@ -12,6 +12,7 @@ export const input = {
   slider: null,
   keys: new Set(),
   usingPad: false,         // last input came from a game controller (hides touch hints)
+  pushVisible: false,      // the push button is on screen (push battle)
 };
 
 let layout = null;
@@ -30,6 +31,9 @@ export function updateLayout(view) {
     // slider takes the right half.
     joyHome: { x: view.w / 2, y: bottom - R * 1.4 },
     joyHomeLeft: { x: Math.max(pad + R, view.w / 4), y: bottom - R * 1.4 },
+    // Push button (push battle): bottom right, or bottom left when the slider has the right half.
+    pushRight: { x: view.w - pad - R * 0.8, y: bottom - R * 0.8, r: R * 0.8 },
+    pushLeft: { x: pad + R * 0.8, y: bottom - R * 0.8, r: R * 0.8 },
     slider: {
       w: sliderW,
       upLen,                              // rest → top
@@ -47,6 +51,10 @@ export function updateLayout(view) {
 
 export function getLayout() {
   return layout;
+}
+
+export function pushButton() {
+  return input.sliderEnabled ? layout.pushLeft : layout.pushRight;
 }
 
 // Movement direction in screen space with magnitude 0..1, or null when idle.
@@ -116,13 +124,18 @@ function tickOnBandChange() {
   lastLevel = level;
 }
 
-// handlers: { active(), jump(power 0..1, screenDir?), restart() }
+// handlers: { active(), jump(power 0..1, screenDir?), push(), restart(), pause() }
 export function initInput(canvas, handlers) {
   canvas.addEventListener('pointerdown', (e) => {
     input.usingPad = false;
     if (!handlers.active()) return;
     e.preventDefault();
     const x = e.clientX, y = e.clientY;
+    const pb = pushButton();
+    if (input.pushVisible && Math.hypot(x - pb.x, y - pb.y) < pb.r * 1.25) {
+      handlers.push(); // a tap on the push button, not the start of a walk
+      return;
+    }
     if (input.sliderEnabled && x > window.innerWidth / 2) {
       // The slider appears under your thumb anywhere on the right half.
       if (input.slider) return;
@@ -201,6 +214,7 @@ export function initInput(canvas, handlers) {
     const k = keyName(e);
     if (k === 'r') return handlers.restart();
     if (k === 'p') return handlers.pause();
+    if (k === 'f') return handlers.active() && handlers.push();
     if (k === ' ') {
       // Holding Space fills the slider up over CHARGE_TIME (see keyboardFill).
       e.preventDefault();

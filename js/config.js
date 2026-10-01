@@ -1,6 +1,6 @@
 // Every tunable number in the game lives here. Tweak, save, refresh.
 export const CONFIG = {
-  BUILD: 22,                        // shown on the title screen; bump on every deploy
+  BUILD: 23,                        // shown on the title screen; bump on every deploy
 
   // World layout (all distances in world pixels from the vortex centre)
   RIM: 4500,                        // outer edge, where fresh tiles drift in
@@ -89,6 +89,25 @@ export const CONFIG = {
   DOUBLE_TAP_DIST: 70,              // ...and this close (px) to it
   AIM_DEADZONE: 20,                 // px of drag that does nothing (let go here to cancel)
   AIM_DRAG: 110,                    // px of drag for a full-length jump
+
+  // Push battle (Multiplayer; offline against bots for now)
+  BATTLE_LIVES: 3,
+  BATTLE_STRENGTH_MAX: 3,           // the vortex still strengthens, but stops here
+  BATTLE_SPREAD: 0.17,              // rad between players on the start ring (about 240px apart)
+  BATTLE_PICKUPS: 6,
+  RESPAWN_PROTECT: 2,               // seconds of push immunity after respawning
+  PUSH_MAX_CHARGES: 3,
+  PUSH_CONE: 30,                    // degrees, edge to edge
+  PUSH_RANGE: 220,                  // px; nothing beyond
+  PUSH_SPEED: 700,                  // px/s shove at point-blank...
+  PUSH_FAR: 0.4,                    // ...falling to this share at full reach
+  PUSH_WINDUP: 0.2,                 // s of visible gust before it fires
+  PUSH_COOLDOWN: 0.6,
+  PUSH_DAMPING: 5,                  // how fast a shove slows to a stop
+  BOT_THINK: 0.25,                  // s between bot decisions (randomised a little)
+  BOT_REACTION: 0.35,               // s from deciding to push to pushing
+  BOT_AIM_ERROR: 6,                 // degrees of push aim error
+  BOT_JUMP_ERROR: 3,                // degrees of jump aim error
 
   // Game controller
   PAD_DEADZONE: 0.2,                // left stick (walk)

@@ -24,7 +24,9 @@ function randomPointOn(tile) {
 }
 
 function spawn(state) {
-  const p = state.player;
+  // Spawn around a random player still in the game, so pickups show up near everyone.
+  const live = state.actors.filter((a) => !a.out);
+  const p = live[Math.floor(Math.random() * live.length)] || state.player;
   const taken = new Set(state.pickups.map((k) => k.tile));
   const options = state.tiles.filter((t) => {
     if (t.rubble || t === p.tile || taken.has(t)) return false;
@@ -53,10 +55,10 @@ export function rehome(state, parent, frags) {
   }
 }
 
-// Moves pickups with their tiles, collects any the player touches, keeps the count up.
-// Returns the pickups collected this frame (with the calm they gave).
+// Moves pickups with their tiles, collects any a player touches, keeps the count up.
+// Returns the pickups collected this frame: { actor, x, y, calm }.
 export function updatePickups(state, dt, alive) {
-  const p = state.player;
+  const live = state.actors.filter((a) => !a.out);
   const got = [];
   state.pickups = state.pickups.filter((k) => {
     if (!k.tile || !alive.has(k.tile)) return false;
@@ -64,14 +66,18 @@ export function updatePickups(state, dt, alive) {
     k.x = w.x;
     k.y = w.y;
     k.age += dt;
-    if (Math.hypot(k.x - p.x, k.y - p.y) > C.PICKUP_FORGET) return false;
-    if (p.mode !== 'falling' && Math.hypot(k.x - p.x, k.y - p.y) < C.PICKUP_RADIUS) {
-      got.push({ x: k.x, y: k.y, calm: calmAt(k.x, k.y) });
-      return false;
+    let near = Infinity;
+    for (const a of live) {
+      const d = Math.hypot(k.x - a.x, k.y - a.y);
+      near = Math.min(near, d);
+      if (a.mode !== 'falling' && d < C.PICKUP_RADIUS) {
+        got.push({ actor: a, x: k.x, y: k.y, calm: calmAt(k.x, k.y) });
+        return false;
+      }
     }
-    return true;
+    return near <= C.PICKUP_FORGET;
   });
-  while (state.pickups.length < C.PICKUP_COUNT) {
+  while (state.pickups.length < state.pickupCount) {
     const before = state.pickups.length;
     spawn(state);
     if (state.pickups.length === before) break;

@@ -2,7 +2,7 @@
 import { CONFIG as C } from './config.js';
 import * as G from './geometry.js';
 import { speedFactor } from './world.js';
-import { input, getLayout, sliderCancelled, aimVector } from './input.js';
+import { input, getLayout, sliderCancelled, aimVector, pushButton } from './input.js';
 import { calmAt } from './pickups.js';
 
 export function formatTime(t) {
@@ -165,6 +165,33 @@ function worldToScreen(state, x, y) {
   return { x: o.x + p.x * s, y: o.y + p.y * s };
 }
 
+// Each bot's name and lives, floating upright above it.
+function drawBotLabels(ctx, state) {
+  if (state.gameMode !== 'battle') return;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const a of state.actors) {
+    if (!a.bot || a.out || a.mode === 'falling') continue;
+    const p = worldToScreen(state, a.x, a.y);
+    ctx.font = '700 11px system-ui, sans-serif';
+    ctx.fillStyle = actorColour(a, 75);
+    ctx.fillText(a.name, p.x, p.y - 30);
+    lifePips(ctx, p.x, p.y - 18, a, 3.5);
+  }
+}
+
+// Filled dots for lives left, hollow for lives lost.
+function lifePips(ctx, cx, cy, a, r) {
+  const gap = r * 3;
+  for (let i = 0; i < C.BATTLE_LIVES; i++) {
+    const x = cx + (i - (C.BATTLE_LIVES - 1) / 2) * gap;
+    ctx.beginPath();
+    ctx.arc(x, cy, r, 0, G.TAU);
+    if (i < a.lives) { ctx.fillStyle = actorColour(a, 70); ctx.fill(); }
+    else { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke(); }
+  }
+}
+
 function drawPopups(ctx, state) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -187,7 +214,15 @@ function drawPickupArrows(ctx, state) {
   const near = [...state.pickups]
     .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))
     .slice(0, 5);
-  for (const k of near) {
+  const marks = near.map((k) => {
+    const deep = calmAt(k.x, k.y) / C.CALM_MAX;
+    return { x: k.x, y: k.y, size: 7 + deep * 6, colour: `hsla(${190 + deep * 120},100%,72%,0.9)` };
+  });
+  // In a battle, opponents get arrows too (bigger, in their colour).
+  for (const a of state.actors) {
+    if (a.bot && !a.out && a.mode !== 'falling') marks.push({ x: a.x, y: a.y, size: 11, colour: actorColour(a) });
+  }
+  for (const k of marks) {
     const sp = worldToScreen(state, k.x, k.y);
     if (sp.x > left && sp.x < right && sp.y > top && sp.y < bottom) continue; // on screen
     const dx = sp.x - o.x, dy = sp.y - o.y;
@@ -198,9 +233,8 @@ function drawPickupArrows(ctx, state) {
     if (dy < 0) t = Math.min(t, (top - o.y) / dy);
     const x = o.x + dx * t, y = o.y + dy * t;
     const len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
-    const deep = calmAt(k.x, k.y) / C.CALM_MAX;
-    const size = 7 + deep * 6;
-    ctx.fillStyle = `hsla(${190 + deep * 120},100%,72%,0.9)`;
+    const size = k.size;
+    ctx.fillStyle = k.colour;
     ctx.beginPath();
     ctx.moveTo(x + ux * size, y + uy * size);
     ctx.lineTo(x - ux * size * 0.6 - uy * size * 0.7, y - uy * size * 0.6 + ux * size * 0.7);
@@ -222,8 +256,31 @@ function drawCore(ctx) {
   ctx.fill();
 }
 
-function drawPlayer(ctx, state, px) {
-  const p = state.player;
+// Colour for an actor: you are white, bots get their own hue.
+function actorColour(a, light = 62) {
+  return a.bot ? `hsl(${a.hue},85%,${light}%)` : '#fff';
+}
+
+// The 30° push cone in front of `a`, as a wedge path.
+function conePath(ctx, a, f) {
+  const half = (C.PUSH_CONE / 2) * (Math.PI / 180), ang = Math.atan2(f.y, f.x);
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.arc(a.x, a.y, C.PUSH_RANGE, ang - half, ang + half);
+  ctx.closePath();
+}
+
+function drawGusts(ctx, state) {
+  for (const g of state.gusts) {
+    conePath(ctx, g, g.f);
+    ctx.fillStyle = `rgba(200,240,255,${0.35 * (1 - g.t / 0.4)})`;
+    ctx.fill();
+  }
+}
+
+function drawActor(ctx, state, px, p) {
+  if (p.out) return;
+  const you = p === state.player;
   let r = C.PLAYER_R, alpha = 1, lift = 0;
   if (p.mode === 'air') lift = Math.sin(Math.PI * Math.min(1, p.jump.t / p.jump.dur));
   if (p.mode === 'falling') {
@@ -233,7 +290,18 @@ function drawPlayer(ctx, state, px) {
   }
   if (r <= 0) return;
 
-  if (state.aim) {
+  // Push wind-up: the cone brightens until it fires.
+  if (p.push) {
+    conePath(ctx, p, p.face);
+    const k = Math.min(1, p.push.t / C.PUSH_WINDUP);
+    ctx.fillStyle = `rgba(200,240,255,${0.08 + 0.12 * k})`;
+    ctx.fill();
+    ctx.lineWidth = 1.5 * px;
+    ctx.strokeStyle = `rgba(200,240,255,${0.3 + 0.5 * k})`;
+    ctx.stroke();
+  }
+
+  if (you && state.aim) {
     // Aiming a jump (double-tap-and-drag or slider): faint max-range ring, dashed line and a marker where you'll land.
     const a = state.aim;
     ctx.lineWidth = 1.5 * px;
@@ -270,17 +338,26 @@ function drawPlayer(ctx, state, px) {
   }
   ctx.globalAlpha = alpha;
   const s = 1 + lift * 0.7;
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillStyle = p.bot ? `hsla(${p.hue},85%,62%,0.25)` : 'rgba(255,255,255,0.2)';
   ctx.beginPath();
   ctx.arc(p.x, p.y, r * s * 1.8, 0, G.TAU);
   ctx.fill();
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = actorColour(p);
   ctx.beginPath();
   ctx.arc(p.x, p.y, r * s, 0, G.TAU);
   ctx.fill();
 
+  // Push immunity after respawning: a pulsing ring.
+  if (p.protect > 0) {
+    ctx.lineWidth = 2 * px;
+    ctx.strokeStyle = `rgba(120,220,255,${0.4 + 0.4 * Math.sin(performance.now() / 90)})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * s + 10 * px, 0, G.TAU);
+    ctx.stroke();
+  }
+
   // Small gold chevron pointing outward, towards the rim (the view no longer keeps outward up).
-  if (p.mode !== 'falling') {
+  if (you && p.mode !== 'falling') {
     const rr = Math.hypot(p.x, p.y) || 1, ox = p.x / rr, oy = p.y / rr;
     const d = r * s + 26 * px, g = 5 * px;
     const cx = p.x + ox * d, cy = p.y + oy * d;
@@ -295,8 +372,8 @@ function drawPlayer(ctx, state, px) {
   }
 
   // Facing arrow
-  const f = state.face, tip = r * s + 9 * px, base = r * s + 3 * px, wing = 5 * px;
-  ctx.fillStyle = '#5affaa';
+  const f = p.face, tip = r * s + 9 * px, base = r * s + 3 * px, wing = 5 * px;
+  ctx.fillStyle = p.bot ? actorColour(p, 80) : '#5affaa';
   ctx.beginPath();
   ctx.moveTo(p.x + f.x * tip, p.y + f.y * tip);
   ctx.lineTo(p.x + f.x * base - f.y * wing, p.y + f.y * base + f.x * wing);
@@ -361,6 +438,13 @@ function drawMinimap(ctx, state) {
     ctx.fillStyle = `hsl(${190 + (calmAt(k.x, k.y) / C.CALM_MAX) * 120},100%,70%)`;
     ctx.fillRect(cx + k.x * s - 1.5, cy + k.y * s - 1.5, 3, 3);
   }
+  for (const a of state.actors) {
+    if (!a.bot || a.out) continue;
+    ctx.fillStyle = actorColour(a);
+    ctx.beginPath();
+    ctx.arc(cx + a.x * s, cy + a.y * s, 2.5, 0, G.TAU);
+    ctx.fill();
+  }
   const p = state.player;
   ctx.fillStyle = '#fff';
   ctx.beginPath();
@@ -371,7 +455,55 @@ function drawMinimap(ctx, state) {
 
 function drawHud(ctx, state) {
   if (state.mode === 'title') return;
+  if (state.gameMode === 'battle') drawBattleHud(ctx, state);
+  else drawSoloHud(ctx, state);
 
+  if (state.message) {
+    const m = state.message;
+    const alpha = Math.min(1, m.t * 4, (2.5 - m.t) * 2);
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = '700 22px system-ui, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(m.text, state.view.w / 2, state.view.h * 0.18);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Battle: one row per player with lives and push charges.
+function drawBattleHud(ctx, state) {
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = '700 20px system-ui, sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(formatTime(state.time), 14, 12);
+  state.actors.forEach((a, i) => {
+    const y = 44 + i * 20;
+    ctx.globalAlpha = a.out ? 0.4 : 1;
+    ctx.fillStyle = actorColour(a, 70);
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(a.out ? `${a.name} (out)` : a.name, 14, y + 6);
+    lifePips(ctx, 96, y + 6, a, 4);
+    // Push charges: small cyan wedges.
+    ctx.fillStyle = 'rgba(160,230,255,0.9)';
+    for (let c = 0; c < a.charges; c++) {
+      const x = 124 + c * 12;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.lineTo(x + 8, y + 6);
+      ctx.lineTo(x, y + 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  });
+  ctx.textBaseline = 'top';
+}
+
+// Solo: time survived, personal best and the vortex meter.
+function drawSoloHud(ctx, state) {
   // Time survived (the score) and personal best
   ctx.fillStyle = '#fff';
   ctx.font = '700 28px system-ui, sans-serif';
@@ -396,17 +528,6 @@ function drawHud(ctx, state) {
   ctx.fillRect(bx, by + 16, bw * Math.max(0.02, k), 8);
   ctx.fillStyle = 'rgba(5,6,13,0.9)';
   for (let x = 1; x < span; x++) ctx.fillRect(bx + (bw * x) / span - 1, by + 16, 2, 8);
-
-  if (state.message) {
-    const m = state.message;
-    const alpha = Math.min(1, m.t * 4, (2.5 - m.t) * 2);
-    ctx.globalAlpha = Math.max(0, alpha);
-    ctx.textAlign = 'center';
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(m.text, state.view.w / 2, state.view.h * 0.18);
-    ctx.globalAlpha = 1;
-  }
 }
 
 // Joystick: sits at its home spot until a thumb lands.
@@ -436,6 +557,29 @@ function drawControls(ctx, state) {
   if (!input.aim && !(input.usingPad && !input.joy)) drawJoystick(ctx, L); // hidden while aiming a jump
   if (input.sliderEnabled && !(input.usingPad && !input.slider)) drawSlider(ctx, L.slider);
   drawAimControl(ctx);
+  if (input.pushVisible && !input.usingPad) drawPushButton(ctx, state);
+}
+
+// Push battle: the push button shows your charges; dim when empty or cooling down.
+function drawPushButton(ctx, state) {
+  const b = pushButton(), p = state.player;
+  const ready = p.charges > 0 && p.cooldown <= 0 && !p.push && p.mode === 'tile';
+  ctx.globalAlpha = ready ? 1 : 0.4;
+  ctx.fillStyle = 'rgba(160,230,255,0.22)';
+  ctx.strokeStyle = 'rgba(160,230,255,0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, G.TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#e6f8ff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 13px system-ui, sans-serif';
+  ctx.fillText('PUSH', b.x, b.y - 6);
+  ctx.font = '700 12px system-ui, sans-serif';
+  ctx.fillText(`${p.charges}/${C.PUSH_MAX_CHARGES}`, b.x, b.y + 10);
+  ctx.globalAlpha = 1;
 }
 
 // Double-tap-and-drag jump: a ring around where the second tap landed, a red
@@ -589,10 +733,13 @@ export function render(canvas, state) {
     ctx.fillRect(q.x - 2 * px, q.y - 2 * px, 4 * px, 4 * px);
   }
   drawPickups(ctx, state, px);
+  drawGusts(ctx, state);
   drawCore(ctx);
-  drawPlayer(ctx, state, px);
+  for (const a of state.actors) if (a !== state.player) drawActor(ctx, state, px, a);
+  drawActor(ctx, state, px, state.player);
   ctx.restore();
 
+  drawBotLabels(ctx, state);
   drawPopups(ctx, state);
   drawPickupArrows(ctx, state);
   drawMinimap(ctx, state);
